@@ -6,15 +6,15 @@ The XML format is:
 
 .. code-block:: xml
 
-	<SVG>
-		<svgDoc endGlyphID="1" startGlyphID="1">
-			<![CDATA[ <complete SVG doc> ]]
-		</svgDoc>
-	...
-		<svgDoc endGlyphID="n" startGlyphID="m">
-			<![CDATA[ <complete SVG doc> ]]
-		</svgDoc>
-	</SVG>
+        <SVG>
+                <svgDoc endGlyphID="1" startGlyphID="1">
+                        <![CDATA[ <complete SVG doc> ]]
+                </svgDoc>
+        ...
+                <svgDoc endGlyphID="n" startGlyphID="m">
+                        <![CDATA[ <complete SVG doc> ]]
+                </svgDoc>
+        </SVG>
 """
 
 from fontTools.misc.textTools import bytesjoin, safeEval, strjoin, tobytes, tostr
@@ -25,7 +25,6 @@ from dataclasses import dataclass, astuple
 from io import BytesIO
 import struct
 import logging
-
 
 log = logging.getLogger(__name__)
 
@@ -51,6 +50,14 @@ doc_index_entry_format_0Size = sstruct.calcsize(doc_index_entry_format_0)
 
 
 class table_S_V_G_(DefaultTable.DefaultTable):
+    """Scalable Vector Graphics table
+
+    The ``SVG`` table contains representations for glyphs in the SVG
+    image format.
+
+    See also https://learn.microsoft.com/en-us/typography/opentype/spec/stat
+    """
+
     def decompile(self, data, ttFont):
         self.docList = []
         # Version 0 is the standardized version of the table; and current.

@@ -1,39 +1,56 @@
-def round_robin(processos, quantum=2, ctx_time=0.5):
+def round_robin(processos, quantum=2, ctx_time=0):
     tempo_atual = 0
-    total_espera = 0
-    total_execucao = 0
-    ultimo_processo = None
+    ultimo_processo_id = None
+    quantum = int(quantum)
+    ctx_time = float(ctx_time)
 
-    processos_ordenados = sorted(processos, key=lambda p: p.chegada)
-    fila = []
+    # 1. Inicialização limpa dos processos
+    for p in processos:
+        p.tempo_restante = int(p.duracao)
+        p.tempo_executado = 0
+        p.processamentos = []
 
-    while processos_ordenados:
-        for processo in processos_ordenados:
-            if(processo.chegada <= tempo_atual and processo not in fila):
-                fila.append(processo)
+    # C3: Desempate inicial por ordem de chegada e depois por ID
+    nao_chegados = sorted(processos, key=lambda p: (p.chegada, p.id))
+    fila_prontos = []
 
-        if not fila:
-            tempo_atual += 1
-            continue
+    while nao_chegados or fila_prontos:
+        # Se a CPU está ociosa, salta direto para a próxima chegada (C10)
+        if not fila_prontos:
+            tempo_atual = max(tempo_atual, nao_chegados[0].chegada)
 
-        processo_atual = fila.pop(0)
-        processos_ordenados.remove(processo_atual)        # Adiciona tempo de troca de contexto se necessário
-        if ultimo_processo is not None and ultimo_processo != processo_atual and ctx_time > 0:
-            # Apenas o processo que está saindo registra a troca de contexto
-            ctx_duracao = ultimo_processo.adicionar_troca_contexto(tempo_atual, tempo_atual + ctx_time)
-            tempo_atual += ctx_duracao
+        # Adiciona à fila de prontos todos que chegaram até o instante atual
+        while nao_chegados and nao_chegados[0].chegada <= tempo_atual:
+            fila_prontos.append(nao_chegados.pop(0))
 
-        tempo_atual += processo_atual.adicionar_processamento(tempo_atual, tempo_atual + quantum)
+        # 2. Despacha o primeiro processo da fila
+        p_atual = fila_prontos.pop(0)
 
-        if processo_atual.tempo_restante == 0:
-            total_execucao += processo_atual.get_turnaround()
-            total_espera += processo_atual.get_espera()
-        else:
-            processos_ordenados.append(processo_atual)
+        # 3. Troca de Contexto na tarefa que está ENTRANDO (C4: inclusive no 1º despacho)
+        if p_atual.id != ultimo_processo_id and ctx_time > 0:
+            p_atual.adicionar_troca_contexto(tempo_atual, tempo_atual + ctx_time)
+            tempo_atual += ctx_time
 
-        ultimo_processo = processo_atual
+        # 4. Executa até o limite do quantum
+        tempo_rodar = min(p_atual.tempo_restante, quantum)
+        p_atual.adicionar_processamento(tempo_atual, tempo_atual + tempo_rodar)
+        tempo_atual += tempo_rodar
 
-    media_espera = total_espera / len(processos)
-    media_execucao = total_execucao / len(processos)
-    
-    return media_espera, media_execucao, "Round Robin"
+        # 5. Processos que chegaram durante a execução entram na fila antes da reinserção
+        while nao_chegados and nao_chegados[0].chegada <= tempo_atual:
+            fila_prontos.append(nao_chegados.pop(0))
+
+        # 6. Se ainda resta tempo de execução, volta para o fim da fila de prontos
+        if p_atual.tempo_restante > 0:
+            fila_prontos.append(p_atual)
+
+        ultimo_processo_id = p_atual.id
+
+    # 7. Cálculo das métricas oficiais (C8: tw = tt - tp)
+    if not processos:
+        return 0, 0, "Round Robin"
+
+    media_execucao = sum(p.get_turnaround() for p in processos) / len(processos)
+    media_espera = sum(p.get_espera() for p in processos) / len(processos)
+
+    return media_execucao, media_espera, "Round Robin"

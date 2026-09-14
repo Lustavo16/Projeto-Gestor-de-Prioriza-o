@@ -1,34 +1,47 @@
-def sjf(processos, ctx_time=0.5):
+def sjf(processos, ctx_time=0):
     tempo_atual = 0
-    total_espera = 0
-    total_execucao = 0
-    ultimo_processo = None
+    ultimo_processo_id = None  # None garante que o primeiro despacho pague a troca (C4)
 
-    processos_ordenados = sorted(processos, key=lambda p: (p.chegada, p.duracao))
+    processos_pendentes = list(processos)
 
-    while processos_ordenados:
-        processo_atual = processos_ordenados[0]
+    for p in processos:
+        p.tempo_restante = int(p.duracao)
+        p.tempo_executado = 0
+        p.processamentos = []
 
-        if processo_atual.chegada > tempo_atual:
-            tempo_atual += processo_atual.chegada
+    while processos_pendentes:
+        # 1. Filtra quem já chegou na fila de prontos
+        chegados = [p for p in processos_pendentes if p.chegada <= tempo_atual]
 
-        for processo in processos_ordenados:
-            if processo.chegada <= tempo_atual and processo.duracao < processo_atual.duracao:
-                processo_atual = processo        # Adiciona tempo de troca de contexto se necessário
-        if ultimo_processo is not None and ctx_time > 0:
-            # Apenas o processo que está saindo registra a troca de contexto
-            ctx_duracao = ultimo_processo.adicionar_troca_contexto(tempo_atual, tempo_atual + ctx_time)
-            tempo_atual += ctx_duracao
-        
-        tempo_atual += processo_atual.adicionar_processamento(tempo_atual, tempo_atual + processo_atual.duracao)
-        
-        total_execucao += processo_atual.get_turnaround()
-        total_espera += processo_atual.get_espera()
+        # Se ninguém chegou ainda, salta o relógio para a próxima chegada (C10)
+        if not chegados:
+            tempo_atual = min(p.chegada for p in processos_pendentes)
+            chegados = [p for p in processos_pendentes if p.chegada <= tempo_atual]
 
-        processos_ordenados.remove(processo_atual)
-        ultimo_processo = processo_atual
+        # 2. Seleção SJF com desempate oficial (C3: menor duração, menor chegada, menor id)
+        processo_atual = min(
+            chegados,
+            key=lambda p: (p.duracao, p.chegada, p.id)
+        )
 
-    media_espera = total_espera / len(processos)
-    media_execucao = total_execucao / len(processos)
-    
-    return media_espera, media_execucao, "SJF"
+        # 3. Troca de Contexto (C4: inclusive no 1º despacho)
+        if processo_atual.id != ultimo_processo_id and ctx_time > 0:
+            processo_atual.adicionar_troca_contexto(tempo_atual, tempo_atual + ctx_time)
+            tempo_atual += ctx_time
+
+        # 4. Execução não-preemptiva (cooperativa) até o fim
+        duracao_executada = processo_atual.adicionar_processamento(
+            tempo_atual,
+            tempo_atual + processo_atual.tempo_restante
+        )
+
+        tempo_atual += duracao_executada
+
+        ultimo_processo_id = processo_atual.id
+        processos_pendentes.remove(processo_atual)
+
+    # 5. Métricas (C8)
+    media_espera = sum(p.get_espera() for p in processos) / len(processos)
+    media_execucao = sum(p.get_turnaround() for p in processos) / len(processos)
+
+    return media_execucao, media_espera, "SJF"

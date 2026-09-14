@@ -5,7 +5,6 @@ for shapes.
 from fontTools.pens.basePen import BasePen
 from fontTools.misc.bezierTools import solveQuadratic, solveCubic
 
-
 __all__ = ["PointInsidePen"]
 
 
@@ -15,7 +14,8 @@ class PointInsidePen(BasePen):
     Instances of this class can be recycled, as long as the
     setTestPoint() method is used to set the new point to test.
 
-    Typical usage:
+    :Example:
+        .. code-block::
 
             pen = PointInsidePen(glyphSet, (100, 200))
             outline.draw(pen)

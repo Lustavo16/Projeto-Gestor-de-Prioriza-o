@@ -1,8 +1,9 @@
 """ttLib/sfnt.py -- low-level module to deal with the sfnt file format.
 
 Defines two public classes:
-	SFNTReader
-	SFNTWriter
+
+- SFNTReader
+- SFNTWriter
 
 (Normally you don't have to use these classes explicitly; they are
 used automatically by ttLib.TTFont.)
@@ -12,6 +13,9 @@ classes, since whenever the number of tables changes or whenever
 a table's length changes you need to rewrite the whole file anyway.
 """
 
+from __future__ import annotations
+
+from collections.abc import KeysView
 from io import BytesIO
 from types import SimpleNamespace
 from fontTools.misc.textTools import Tag
@@ -20,7 +24,6 @@ from fontTools.ttLib import TTLibError, TTLibFileIsCollectionError
 import struct
 from collections import OrderedDict
 import logging
-
 
 log = logging.getLogger(__name__)
 
@@ -83,7 +86,7 @@ class SFNTReader(object):
 
         if self.sfntVersion not in ("\x00\x01\x00\x00", "OTTO", "true"):
             raise TTLibError("Not a TrueType or OpenType font (bad sfntVersion)")
-        tables = {}
+        tables: dict[Tag, DirectoryEntry] = {}
         for i in range(self.numTables):
             entry = self.DirectoryEntry()
             entry.fromFile(self.file)
@@ -95,15 +98,15 @@ class SFNTReader(object):
         if self.flavor == "woff":
             self.flavorData = WOFFFlavorData(self)
 
-    def has_key(self, tag):
+    def has_key(self, tag: str | bytes) -> bool:
         return tag in self.tables
 
     __contains__ = has_key
 
-    def keys(self):
+    def keys(self) -> KeysView[Tag]:
         return self.tables.keys()
 
-    def __getitem__(self, tag):
+    def __getitem__(self, tag: str | bytes) -> bytes:
         """Fetch the raw table data."""
         entry = self.tables[Tag(tag)]
         data = entry.loadData(self.file)
@@ -121,10 +124,10 @@ class SFNTReader(object):
                 log.warning("bad checksum for '%s' table", tag)
         return data
 
-    def __delitem__(self, tag):
+    def __delitem__(self, tag: str | bytes) -> None:
         del self.tables[Tag(tag)]
 
-    def close(self):
+    def close(self) -> None:
         self.file.close()
 
     # We define custom __getstate__ and __setstate__ to make SFNTReader pickle-able
@@ -374,10 +377,9 @@ class SFNTWriter(object):
 
     def _calcMasterChecksum(self, directory):
         # calculate checkSumAdjustment
-        tags = list(self.tables.keys())
         checksums = []
-        for i in range(len(tags)):
-            checksums.append(self.tables[tags[i]].checkSum)
+        for tag in self.tables.keys():
+            checksums.append(self.tables[tag].checkSum)
 
         if self.DirectoryEntry != SFNTDirectoryEntry:
             # Create a SFNT directory for checksum calculation purposes
@@ -429,6 +431,18 @@ ttcHeaderFormat = """
 """
 
 ttcHeaderSize = sstruct.calcsize(ttcHeaderFormat)
+
+ttcTailFormatV2 = """
+		> # big endian
+		ulDsigTag:               L  # version 2.0 only
+		ulDsigLength:            L  # version 2.0 only
+		ulDsigOffset:            L  # version 2.0 only
+"""
+
+ttcTailSizeV2 = sstruct.calcsize(ttcTailFormatV2)
+
+TTC_V1 = 0x00010000
+TTC_V2 = 0x00020000
 
 sfntDirectoryFormat = """
 		> # big endian
@@ -487,7 +501,15 @@ class DirectoryEntry(object):
         self.uncompressed = False  # if True, always embed entry raw
 
     def fromFile(self, file):
-        sstruct.unpack(self.format, file.read(self.formatSize), self)
+        data = file.read(self.formatSize)
+        if len(data) != self.formatSize:
+            # A file truncated inside the table directory, or one whose
+            # numTables is corrupt, would otherwise fail with a struct.error.
+            raise TTLibError(
+                "unexpected end of table directory: expected %d bytes but got %d"
+                % (self.formatSize, len(data))
+            )
+        sstruct.unpack(self.format, data, self)
 
     def fromString(self, str):
         sstruct.unpack(self.format, str, self)
@@ -504,7 +526,21 @@ class DirectoryEntry(object):
     def loadData(self, file):
         file.seek(self.offset)
         data = file.read(self.length)
-        assert len(data) == self.length
+        if len(data) != self.length:
+            # A corrupt or truncated table directory entry can point past the
+            # end of the file; raise a TTLibError instead of a bare assertion
+            # (which is also silently skipped under `python -O`).
+            tag = getattr(self, "tag", None)
+            raise TTLibError(
+                "unexpected end of '%s' table data: expected %d bytes but got "
+                "%d at offset %d"
+                % (
+                    Tag(tag) if tag is not None else "????",
+                    self.length,
+                    len(data),
+                    self.offset,
+                )
+            )
         if hasattr(self.__class__, "decodeData"):
             data = self.decodeData(data)
         return data
@@ -631,26 +667,37 @@ def readTTCHeader(file):
     sstruct.unpack(ttcHeaderFormat, data, self)
     if self.TTCTag != "ttcf":
         raise TTLibError("Not a Font Collection")
-    assert self.Version == 0x00010000 or self.Version == 0x00020000, (
+    assert self.Version in (TTC_V1, TTC_V2), (
         "unrecognized TTC version 0x%08x" % self.Version
     )
     self.offsetTable = struct.unpack(
         ">%dL" % self.numFonts, file.read(self.numFonts * 4)
     )
-    if self.Version == 0x00020000:
-        pass  # ignoring version 2.0 signatures
+    if self.Version == TTC_V2:
+        # Unpack additional DSIG fields
+        data = file.read(ttcTailSizeV2)
+        if len(data) != ttcTailSizeV2:
+            raise TTLibError("Not a Font Collection (not enough data)")
+        sstruct.unpack(ttcTailFormatV2, data, self)
     return self
 
 
-def writeTTCHeader(file, numFonts):
+def writeTTCHeader(file, numFonts, version=TTC_V1):
     self = SimpleNamespace()
     self.TTCTag = "ttcf"
-    self.Version = 0x00010000
+    self.Version = version
+    assert self.Version in (TTC_V1, TTC_V2), (
+        "unrecognized TTC version 0x%08x" % self.Version
+    )
     self.numFonts = numFonts
     file.seek(0)
     file.write(sstruct.pack(ttcHeaderFormat, self))
     offset = file.tell()
     file.write(struct.pack(">%dL" % self.numFonts, *([0] * self.numFonts)))
+    if version == TTC_V2:
+        # write empty ulDsigTag, ulDsigLength, ulDsigOffset
+        # Actual values are be written in TTCollection.save()
+        file.write(struct.pack(">3L", 0, 0, 0))
     return offset
 
 

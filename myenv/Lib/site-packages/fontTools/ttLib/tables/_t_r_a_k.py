@@ -11,7 +11,6 @@ from . import DefaultTable
 import struct
 from collections.abc import MutableMapping
 
-
 # Apple's documentation of 'trak':
 # https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6trak.html
 
@@ -58,7 +57,12 @@ PER_SIZE_VALUE_FORMAT_SIZE = struct.calcsize(PER_SIZE_VALUE_FORMAT)
 
 
 class table__t_r_a_k(DefaultTable.DefaultTable):
-    dependencies = ["name"]
+    """The AAT ``trak`` table can store per-size adjustments to each glyph's
+    sidebearings to make when tracking is enabled, which applications can
+    use to provide more visually balanced line spacing.
+
+    See also https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6trak.html
+    """
 
     def compile(self, ttFont):
         dataList = []

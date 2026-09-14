@@ -6,38 +6,100 @@ from control import simular_escalonamento
 from model import Processo
 from model.prioridade import Prioridade
 from view import grafico_processos
+from control.gerador_cenarios.gerador_cenarios import gerar_cenario
+from view.simulacao_lotes import configurar_tela_lotes
 
 processos = []
 
+
 def adicionar_processo():
     try:
-        chegada = int(entrada_chegada.get())
-        duracao = int(entrada_duracao.get())
-        prioridade_num = int(entrada_prioridade.get())
-        
-        novo_id = max(processo.id for processo in processos) + 1 if processos else 1
+        chegada = int(entrada_chegada.get().strip())
+        duracao = int(entrada_duracao.get().strip())
+        prioridade_num = int(entrada_prioridade.get().strip())
 
-        processo = Processo(novo_id, chegada, duracao, Prioridade(prioridade_num))
+        # Leitura dos campos opcionais de Seção Crítica (C7)
+        sc_inicio_str = entrada_sc_inicio.get().strip()
+        sc_duracao_str = entrada_sc_duracao.get().strip()
+
+        sc_inicio = None
+        sc_duracao = None
+
+        if sc_inicio_str or sc_duracao_str:
+            if not (sc_inicio_str and sc_duracao_str):
+                messagebox.showerror(
+                    "Erro",
+                    "Para definir seção crítica, informe início e duração."
+                )
+                return
+
+            sc_inicio = int(sc_inicio_str)
+            sc_duracao = int(sc_duracao_str)
+
+            # Validação R2: Seção crítica deve estar contida na duração da tarefa
+            if (
+                sc_inicio < 0
+                or sc_duracao <= 0
+                or (sc_inicio + sc_duracao) > duracao
+            ):
+                messagebox.showerror(
+                    "Erro",
+                    "A seção crítica deve ser válida e estar contida na duração da tarefa."
+                )
+                return
+
+        novo_id = (
+            max(processo.id for processo in processos) + 1
+            if processos else 1
+        )
+
+        processo = Processo(
+            novo_id,
+            chegada,
+            duracao,
+            Prioridade(prioridade_num),
+            sc_inicio=sc_inicio,
+            sc_duracao=sc_duracao
+        )
+
         processos.append(processo)
 
-        lista_processos.insert(tk.END, f"ID: {novo_id}, Chegada: {chegada}, Duração: {duracao}, Prioridade: {prioridade_num}")
+        sc_texto = (
+            f", SC: [{sc_inicio}, {sc_inicio + sc_duracao})"
+            if sc_inicio is not None
+            else ""
+        )
 
+        lista_processos.insert(
+            tk.END,
+            f"ID: {novo_id}, Chegada: {chegada}, "
+            f"Duração: {duracao}, Prioridade: {prioridade_num}{sc_texto}"
+        )
+
+        # Limpar campos de entrada
         entrada_chegada.delete(0, tk.END)
         entrada_duracao.delete(0, tk.END)
         entrada_prioridade.delete(0, tk.END)
-    except ValueError as e:
-        messagebox.showerror("Erro", "Valores inválidos. Use apenas números inteiros positivos.")
+        entrada_sc_inicio.delete(0, tk.END)
+        entrada_sc_duracao.delete(0, tk.END)
+
+    except ValueError:
+        messagebox.showerror(
+            "Erro",
+            "Valores inválidos. Use apenas números inteiros."
+        )
+
 
 def remover_processo():
     if len(lista_processos.curselection()):
         index_selecionado = lista_processos.curselection()[0]
         lista_processos.delete(index_selecionado)
+        processos.pop(index_selecionado)
 
-        processo_selecionado = processos[index_selecionado]
-        processos.remove(processo_selecionado)
     elif processos:
         processos.pop()
         lista_processos.delete(lista_processos.size() - 1)
+
 
 def editar_processo():
     if len(lista_processos.curselection()):
@@ -46,26 +108,175 @@ def editar_processo():
 
         entrada_chegada.delete(0, tk.END)
         entrada_chegada.insert(0, processo_selecionado.chegada)
+
         entrada_duracao.delete(0, tk.END)
         entrada_duracao.insert(0, processo_selecionado.duracao)
+
         entrada_prioridade.delete(0, tk.END)
-        entrada_prioridade.insert(0, processo_selecionado.prioridade.numero)
+
+        p_val = (
+            processo_selecionado.prioridade.numero
+            if hasattr(processo_selecionado.prioridade, 'numero')
+            else processo_selecionado.prioridade
+        )
+
+        entrada_prioridade.insert(0, p_val)
+
+        entrada_sc_inicio.delete(0, tk.END)
+        if getattr(processo_selecionado, 'sc_inicio', None) is not None:
+            entrada_sc_inicio.insert(0, processo_selecionado.sc_inicio)
+
+        entrada_sc_duracao.delete(0, tk.END)
+        if getattr(processo_selecionado, 'sc_duracao', None) is not None:
+            entrada_sc_duracao.insert(0, processo_selecionado.sc_duracao)
 
         lista_processos.delete(index_selecionado)
         processos.pop(index_selecionado)
 
+def gerar_cenario_interface():
+    try:
+        quantidade = int(
+            quantidade_cenario_entry.get().strip()
+        )
+
+        if quantidade <= 0:
+            messagebox.showerror(
+                "Erro",
+                "A quantidade de tarefas deve ser maior que zero."
+            )
+            return
+
+        if processos:
+            confirmar = messagebox.askyesno(
+                "Gerar cenário",
+                "Os processos atuais serão substituídos. Deseja continuar?"
+            )
+
+            if not confirmar:
+                return
+
+        novo_cenario = gerar_cenario(quantidade)
+
+        processos.clear()
+        processos.extend(novo_cenario)
+
+        lista_processos.delete(
+            0,
+            tk.END
+        )
+
+        for processo in processos:
+            prioridade_num = (
+                processo.prioridade.numero
+                if hasattr(processo.prioridade, "numero")
+                else processo.prioridade
+            )
+
+            sc_texto = (
+                f", SC: [{processo.sc_inicio}, "
+                f"{processo.sc_inicio + processo.sc_duracao})"
+                if getattr(processo, "sc_inicio", None) is not None
+                else ""
+            )
+
+            lista_processos.insert(
+                tk.END,
+                f"ID: {processo.id}, "
+                f"Chegada: {processo.chegada}, "
+                f"Duração: {processo.duracao}, "
+                f"Prioridade: {prioridade_num}"
+                f"{sc_texto}"
+            )
+            
+
+    except ValueError:
+        messagebox.showerror(
+            "Erro",
+            "Informe uma quantidade inteira de tarefas."
+        )
+
+    except Exception as e:
+        messagebox.showerror(
+            "Erro",
+            str(e)
+        )
+
 def form_submit():
     try:
+        if not processos:
+            messagebox.showwarning(
+                "Aviso",
+                "Adicione ao menos um processo antes de simular."
+            )
+            return
+
         processos_submit = copy.deepcopy(processos)
+
         algoritmo = algoritmo_var.get()
-        quantum = quantum_entry.get()
-        ctx_time = float(ctx_entry.get())
 
-        media_execucao, media_espera, nome_processo = simular_escalonamento(processos_submit, algoritmo, quantum, ctx_time)
+        quantum = (
+            int(quantum_entry.get().strip())
+            if quantum_entry.get().strip()
+            else 2
+        )
 
-        grafico_processos(processos_submit, media_execucao, media_espera, nome_processo)
+        ctx_time = (
+            float(ctx_entry.get().strip())
+            if ctx_entry.get().strip()
+            else 0.0
+        )
+
+        # R8: lê o valor do Alpha do Aging
+        alpha = (
+            float(alpha_entry.get().strip())
+            if alpha_entry.get().strip()
+            else 0.0
+        )
+
+        if alpha < 0:
+            messagebox.showerror(
+                "Erro",
+                "O Alpha do Aging não pode ser negativo."
+            )
+            return
+
+        # R4: quantum só faz sentido no Round-Robin
+        # e deve ser maior que a troca de contexto
+        if algoritmo == 3 and quantum <= ctx_time:
+            messagebox.showerror(
+                "Erro",
+                "Sob Round-Robin, o quantum deve ser maior que a troca de contexto."
+            )
+            return
+
+        # R8:
+        # O Aging será passado para o controller.
+        # R8:
+        # O Alpha do Aging será passado para o controller.
+        resultado = simular_escalonamento(
+            processos_submit,
+            algoritmo,
+            quantum,
+            ctx_time,
+            alpha
+        )
+
+        # Suporta tanto retorno com 3 quanto com 4 valores
+        if len(resultado) == 4:
+            media_espera, media_execucao, media_primeira, nome_processo = resultado
+        else:
+            media_espera, media_execucao, nome_processo = resultado
+
+        grafico_processos(
+            processos_submit,
+            media_execucao,
+            media_espera,
+            nome_processo
+        )
+
     except Exception as e:
-        messagebox.showerror("Erro", e)
+        messagebox.showerror("Erro", str(e))
+
 
 def centralizar_janela(janela, largura, altura):
     largura_tela = janela.winfo_screenwidth()
@@ -74,86 +285,460 @@ def centralizar_janela(janela, largura, altura):
     pos_x = (largura_tela // 2) - (largura // 2)
     pos_y = (altura_tela // 2) - (altura // 2)
 
-    janela.geometry(f'{largura}x{altura}+{pos_x}+{pos_y}')
+    janela.geometry(
+        f'{largura}x{altura}+{pos_x}+{pos_y}'
+    )
+
 
 def habilitar_quantum():
+    # Exibe quantum apenas quando Round-Robin (opção 3) for selecionado (R4)
     if algoritmo_var.get() == 3:
-        quantum_label.pack(padx=20, pady=5)
-        quantum_entry.pack(padx=20, pady=5)
+        quantum_label.pack(padx=20, pady=2)
+        quantum_entry.pack(padx=20, pady=2)
     else:
         quantum_label.pack_forget()
         quantum_entry.pack_forget()
 
+    # ==========================================================
+    # R8 - HABILITAÇÃO DO AGING
+    # ==========================================================
+
+    # ==========================================================
+    # R8 - HABILITAÇÃO DO AGING
+    # ==========================================================
+
+    if algoritmo_var.get() in (5, 6, 7, 8, 9):
+        alpha_label.pack(pady=2)
+        alpha_entry.pack(pady=2)
+    else:
+        alpha_label.pack_forget()
+        alpha_entry.pack_forget()
+
+
 def criar_janela():
-    global entrada_chegada, entrada_duracao, entrada_prioridade, lista_processos, algoritmo_var, quantum_label, quantum_entry, ctx_label, ctx_entry
+    global entrada_chegada, entrada_duracao, entrada_prioridade
+    global entrada_sc_inicio, entrada_sc_duracao
+    global lista_processos, algoritmo_var
+    global quantum_label, quantum_entry
+    global ctx_label, ctx_entry
+    global alpha_label, alpha_entry
+    global gerador_label, gerador_frame
+    global quantidade_cenario_entry
+
     janela = tk.Tk()
     janela.title("Simulador de Escalonamento")
     janela.configure(bg="#FFFFFF")
     janela.resizable(False, False)
 
-    centralizar_janela(janela, 750, 750)
+    centralizar_janela(janela, 900, 900)
 
-    algoritmo_var = tk.IntVar()
+    algoritmo_var = tk.IntVar(value=1)
 
-    processos_label = tk.Label(janela, text="Defina os processos", 
-                    font=("Calibri Light", 18, "bold"),
-                    fg="#0D0D0D", 
-                    bg="#FFFFFF")
-    processos_label.pack()
+    processos_label = tk.Label(
+        janela,
+        text="Defina os processos",
+        font=("Calibri", 18, "bold"),
+        fg="#0D0D0D",
+        bg="#FFFFFF"
+    )
+    processos_label.pack(pady=5)
 
-    input_form_frame = tk.Frame(janela, bg="#FFFFFF")
-    input_form_frame.pack(pady=10)
+    input_form_frame = tk.Frame(
+        janela,
+        bg="#FFFFFF"
+    )
+    input_form_frame.pack(pady=5)
 
-    tk.Label(input_form_frame, text="Chegada:", font=("Calibri", 12), bg="#FFFFFF").grid(row=0, column=0, padx=5)
-    entrada_chegada = tk.Entry(input_form_frame, bd=2, highlightbackground="#2C2C2C", highlightcolor="#2C2C2C", font=("Calibri", 12), justify="center")
-    entrada_chegada.grid(row=1, column=0, padx=5, pady=5)
+    # Campos Básicos
+    tk.Label(
+        input_form_frame,
+        text="Chegada:",
+        font=("Calibri", 11),
+        bg="#FFFFFF"
+    ).grid(row=0, column=0, padx=4)
 
-    tk.Label(input_form_frame, text="Duração:", font=("Calibri", 12), bg="#FFFFFF").grid(row=0, column=1, padx=5)
-    entrada_duracao = tk.Entry(input_form_frame, bd=2, highlightbackground="#2C2C2C", highlightcolor="#2C2C2C", font=("Calibri", 12), justify="center")
-    entrada_duracao.grid(row=1, column=1, padx=5, pady=5)
+    entrada_chegada = tk.Entry(
+        input_form_frame,
+        width=8,
+        bd=2,
+        font=("Calibri", 11),
+        justify="center"
+    )
+    entrada_chegada.grid(row=1, column=0, padx=4, pady=3)
 
-    tk.Label(input_form_frame, text="Prioridade:", font=("Calibri", 12), bg="#FFFFFF").grid(row=0, column=2, padx=5)
-    entrada_prioridade = tk.Entry(input_form_frame, bd=2, highlightbackground="#2C2C2C", highlightcolor="#2C2C2C", font=("Calibri", 12), justify="center")
-    entrada_prioridade.grid(row=1, column=2, padx=5, pady=5)
+    tk.Label(
+        input_form_frame,
+        text="Duração:",
+        font=("Calibri", 11),
+        bg="#FFFFFF"
+    ).grid(row=0, column=1, padx=4)
 
-    buttons_form_frame = tk.Frame(janela, bg="#FFFFFF")
-    buttons_form_frame.pack(pady=10)
+    entrada_duracao = tk.Entry(
+        input_form_frame,
+        width=8,
+        bd=2,
+        font=("Calibri", 11),
+        justify="center"
+    )
+    entrada_duracao.grid(row=1, column=1, padx=4, pady=3)
 
-    tk.Button(buttons_form_frame, text="Adicionar Processo", command=adicionar_processo, font=("Calibri", 12), fg="#FFFFFF", bg="#4682B4", activeforeground="#FFFFFF", activebackground="#375579").grid(row=0, column=0, padx=5)
-    tk.Button(buttons_form_frame, text="Remover Processo", command=remover_processo, font=("Calibri", 12), fg="#FFFFFF", bg="#B74343", activeforeground="#FFFFFF", activebackground="#934B4B").grid(row=0, column=1, padx=5)
-    tk.Button(buttons_form_frame, text="Editar Processo", command=editar_processo, font=("Calibri", 12), fg="#FFFFFF", bg="#44B649", activeforeground="#FFFFFF", activebackground="#3E8E40").grid(row=0, column=2, padx=5)
+    tk.Label(
+        input_form_frame,
+        text="Prioridade:",
+        font=("Calibri", 11),
+        bg="#FFFFFF"
+    ).grid(row=0, column=2, padx=4)
 
-    lista_processos = tk.Listbox(janela, width=50, height=5, bd=2, highlightbackground="#2C2C2C", highlightcolor="#2C2C2C", font=("Calibri", 12), justify="center")
-    lista_processos.pack(padx=10, pady=10)
+    entrada_prioridade = tk.Entry(
+        input_form_frame,
+        width=8,
+        bd=2,
+        font=("Calibri", 11),
+        justify="center"
+    )
+    entrada_prioridade.grid(row=1, column=2, padx=4, pady=3)
 
-    algoritmo_label = tk.Label(janela, text="Escolha o algoritmo de escalonamento", 
-                    font=("Calibri Light", 18, "bold"),
-                    fg="#0D0D0D", 
-                    bg="#FFFFFF")
-    algoritmo_label.pack()
+    # Campos Opcionais de Seção Crítica (C7 e R2)
+    tk.Label(
+        input_form_frame,
+        text="Início SC:",
+        font=("Calibri", 11),
+        bg="#FFFFFF"
+    ).grid(row=0, column=3, padx=4)
 
-    radio_frame = tk.Frame(janela, bg="#FFFFFF")
-    radio_frame.pack(pady=10)
+    entrada_sc_inicio = tk.Entry(
+        input_form_frame,
+        width=8,
+        bd=2,
+        font=("Calibri", 11),
+        justify="center"
+    )
+    entrada_sc_inicio.grid(row=1, column=3, padx=4, pady=3)
 
-    tk.Radiobutton(radio_frame, text="1. FCFS", variable=algoritmo_var, value=1, command=habilitar_quantum, font=("Calibri", 14), fg="#2C2C2C", bg="#FFFFFF").grid(row=0, column=0, padx=40)
-    tk.Radiobutton(radio_frame, text="2. SJF", variable=algoritmo_var, value=2, command=habilitar_quantum, font=("Calibri", 14), fg="#2C2C2C", bg="#FFFFFF").grid(row=1, column=0, padx=40)
-    tk.Radiobutton(radio_frame, text="3. Round Robin", variable=algoritmo_var, value=3, command=habilitar_quantum, font=("Calibri", 14), fg="#2C2C2C", bg="#FFFFFF").grid(row=2, column=0, padx=40)
-    tk.Radiobutton(radio_frame, text="4. SRTF", variable=algoritmo_var, value=4, command=habilitar_quantum, font=("Calibri", 14), fg="#2C2C2C", bg="#FFFFFF").grid(row=3, column=0, padx=40)
-    tk.Radiobutton(radio_frame, text="5. Prioridade cooperativo", variable=algoritmo_var, value=5, command=habilitar_quantum, font=("Calibri", 14), fg="#2C2C2C", bg="#FFFFFF").grid(row=0, column=1, padx=40)
-    tk.Radiobutton(radio_frame, text="6. Prioridade preemptivo", variable=algoritmo_var, value=6, command=habilitar_quantum, font=("Calibri", 14), fg="#2C2C2C", bg="#FFFFFF").grid(row=1, column=1, padx=40)
-    tk.Radiobutton(radio_frame, text="7. Inversão de prioridade", variable=algoritmo_var, value=7, command=habilitar_quantum, font=("Calibri", 14), fg="#2C2C2C", bg="#FFFFFF").grid(row=2, column=1, padx=40)
-    tk.Radiobutton(radio_frame, text="8. Herança de prioridade", variable=algoritmo_var, value=8, command=habilitar_quantum, font=("Calibri", 14), fg="#2C2C2C", bg="#FFFFFF").grid(row=3, column=1, padx=40)
-    
-    quantum_label = tk.Label(janela, text="Informe o quantum para Round Robin:", font=("Calibri", 14), fg="#2C2C2C", bg="#FFFFFF")
-    quantum_entry = tk.Entry(janela, bd=2, highlightbackground="#2C2C2C", highlightcolor="#2C2C2C", font=("Calibri", 12), justify="center")
+    tk.Label(
+        input_form_frame,
+        text="Duração SC:",
+        font=("Calibri", 11),
+        bg="#FFFFFF"
+    ).grid(row=0, column=4, padx=4)
+
+    entrada_sc_duracao = tk.Entry(
+        input_form_frame,
+        width=8,
+        bd=2,
+        font=("Calibri", 11),
+        justify="center"
+    )
+    entrada_sc_duracao.grid(row=1, column=4, padx=4, pady=3)
+
+    buttons_form_frame = tk.Frame(
+        janela,
+        bg="#FFFFFF"
+    )
+    buttons_form_frame.pack(pady=6)
+
+    tk.Button(
+        buttons_form_frame,
+        text="Adicionar Processo",
+        command=adicionar_processo,
+        font=("Calibri", 11),
+        fg="#FFFFFF",
+        bg="#4682B4"
+    ).grid(row=0, column=0, padx=5)
+
+    tk.Button(
+        buttons_form_frame,
+        text="Remover Processo",
+        command=remover_processo,
+        font=("Calibri", 11),
+        fg="#FFFFFF",
+        bg="#B74343"
+    ).grid(row=0, column=1, padx=5)
+
+    tk.Button(
+        buttons_form_frame,
+        text="Editar Processo",
+        command=editar_processo,
+        font=("Calibri", 11),
+        fg="#FFFFFF",
+        bg="#44B649"
+    ).grid(row=0, column=2, padx=5)
+
+    lista_processos = tk.Listbox(
+        janela,
+        width=65,
+        height=5,
+        bd=2,
+        font=("Calibri", 11),
+        justify="center"
+    )
+    lista_processos.pack(
+        padx=10,
+        pady=6
+    )
+
+    # ==========================================================
+    # R9 - GERADOR DE CENÁRIOS
+    # ==========================================================
+
+    gerador_label = tk.Label(
+        janela,
+        text="Gerador de cenários",
+        font=("Calibri", 16, "bold"),
+        fg="#0D0D0D",
+        bg="#FFFFFF"
+    )
+    gerador_label.pack(pady=5)
+
+    gerador_frame = tk.Frame(
+        janela,
+        bg="#FFFFFF"
+    )
+    gerador_frame.pack(pady=2)
+
+    tk.Label(
+        gerador_frame,
+        text="Número de tarefas:",
+        font=("Calibri", 11),
+        bg="#FFFFFF"
+    ).grid(row=0, column=0, padx=5)
+
+    quantidade_cenario_entry = tk.Entry(
+        gerador_frame,
+        width=8,
+        bd=2,
+        font=("Calibri", 11),
+        justify="center"
+    )
+    quantidade_cenario_entry.grid(
+        row=1,
+        column=0,
+        padx=5,
+        pady=3
+    )
+
+    quantidade_cenario_entry.insert(0, "10")
+
+    tk.Button(
+        gerador_frame,
+        text="Gerar cenário",
+        command=gerar_cenario_interface,
+        font=("Calibri", 11),
+        fg="#FFFFFF",
+        bg="#6A5ACD"
+    ).grid(
+        row=1,
+        column=1,
+        padx=10
+    )
+
+    algoritmo_label = tk.Label(
+        janela,
+        text="Escolha o algoritmo de escalonamento",
+        font=("Calibri", 16, "bold"),
+        fg="#0D0D0D",
+        bg="#FFFFFF"
+    )
+    algoritmo_label.pack(pady=5)
+
+    radio_frame = tk.Frame(
+        janela,
+        bg="#FFFFFF"
+    )
+    radio_frame.pack(pady=5)
+
+    # Lista completa incluindo o Teto de Prioridade (R7)
+    tk.Radiobutton(
+        radio_frame,
+        text="1. FCFS",
+        variable=algoritmo_var,
+        value=1,
+        command=habilitar_quantum,
+        font=("Calibri", 12),
+        bg="#FFFFFF"
+    ).grid(row=0, column=0, sticky="w", padx=25)
+
+    tk.Radiobutton(
+        radio_frame,
+        text="2. SJF",
+        variable=algoritmo_var,
+        value=2,
+        command=habilitar_quantum,
+        font=("Calibri", 12),
+        bg="#FFFFFF"
+    ).grid(row=1, column=0, sticky="w", padx=25)
+
+    tk.Radiobutton(
+        radio_frame,
+        text="3. Round Robin",
+        variable=algoritmo_var,
+        value=3,
+        command=habilitar_quantum,
+        font=("Calibri", 12),
+        bg="#FFFFFF"
+    ).grid(row=2, column=0, sticky="w", padx=25)
+
+    tk.Radiobutton(
+        radio_frame,
+        text="4. SRTF",
+        variable=algoritmo_var,
+        value=4,
+        command=habilitar_quantum,
+        font=("Calibri", 12),
+        bg="#FFFFFF"
+    ).grid(row=3, column=0, sticky="w", padx=25)
+
+    tk.Radiobutton(
+        radio_frame,
+        text="5. Prioridade cooperativo",
+        variable=algoritmo_var,
+        value=5,
+        command=habilitar_quantum,
+        font=("Calibri", 12),
+        bg="#FFFFFF"
+    ).grid(row=0, column=1, sticky="w", padx=25)
+
+    tk.Radiobutton(
+        radio_frame,
+        text="6. Prioridade preemptivo",
+        variable=algoritmo_var,
+        value=6,
+        command=habilitar_quantum,
+        font=("Calibri", 12),
+        bg="#FFFFFF"
+    ).grid(row=1, column=1, sticky="w", padx=25)
+
+    tk.Radiobutton(
+        radio_frame,
+        text="7. Inversão de prioridade",
+        variable=algoritmo_var,
+        value=7,
+        command=habilitar_quantum,
+        font=("Calibri", 12),
+        bg="#FFFFFF"
+    ).grid(row=2, column=1, sticky="w", padx=25)
+
+    tk.Radiobutton(
+        radio_frame,
+        text="8. Herança de prioridade",
+        variable=algoritmo_var,
+        value=8,
+        command=habilitar_quantum,
+        font=("Calibri", 12),
+        bg="#FFFFFF"
+    ).grid(row=3, column=1, sticky="w", padx=25)
+
+    tk.Radiobutton(
+        radio_frame,
+        text="9. Teto de prioridade",
+        variable=algoritmo_var,
+        value=9,
+        command=habilitar_quantum,
+        font=("Calibri", 12),
+        bg="#FFFFFF"
+    ).grid(row=4, column=1, sticky="w", padx=25)
+
+    # ==========================================================
+    # R8 - AGING
+    # ==========================================================
+
+    alpha_label = tk.Label(
+        janela,
+        text="Alpha do Aging:",
+        font=("Calibri", 12),
+        bg="#FFFFFF"
+    )
+
+    alpha_entry = tk.Entry(
+        janela,
+        bd=2,
+        font=("Calibri", 12),
+        justify="center",
+        width=10
+    )
+
+    alpha_entry.insert(0, "0")
+
+    # Não fazemos .pack() aqui.
+    # O checkbox só aparece quando um algoritmo de prioridade
+    # for selecionado.
+
+    # ==========================================================
+    # ROUND ROBIN
+    # ==========================================================
+
+    quantum_label = tk.Label(
+        janela,
+        text="Quantum para Round Robin:",
+        font=("Calibri", 12),
+        bg="#FFFFFF"
+    )
+
+    quantum_entry = tk.Entry(
+        janela,
+        bd=2,
+        font=("Calibri", 12),
+        justify="center",
+        width=10
+    )
+
     quantum_entry.insert(0, "2")
 
-    ctx_label = tk.Label(janela, text="Tempo de troca de contexto (s):", font=("Calibri", 14), fg="#2C2C2C", bg="#FFFFFF")
-    ctx_entry = tk.Entry(janela, bd=2, highlightbackground="#2C2C2C", highlightcolor="#2C2C2C", font=("Calibri", 12), justify="center")
-    ctx_entry.insert(0, "0.5")
-    ctx_label.pack(padx=20, pady=5)
-    ctx_entry.pack(padx=20, pady=5)
+    # ==========================================================
+    # TROCA DE CONTEXTO
+    # ==========================================================
 
-    tk.Button(janela, text="Simular", command=form_submit, font=("Calibri", 16), fg="#FFFFFF", bg="#FFA500", activeforeground="#FFFFFF", activebackground="#CC8400").pack(padx=20, pady=20)
+    ctx_label = tk.Label(
+        janela,
+        text="Tempo de troca de contexto (s):",
+        font=("Calibri", 12),
+        bg="#FFFFFF"
+    )
+
+    ctx_entry = tk.Entry(
+        janela,
+        bd=2,
+        font=("Calibri", 12),
+        justify="center",
+        width=10
+    )
+
+    ctx_entry.insert(0, "0")
+
+    ctx_label.pack(pady=2)
+    ctx_entry.pack(pady=2)
+
+    tk.Button(
+        janela,
+        text="Simular",
+        command=form_submit,
+        font=("Calibri", 15, "bold"),
+        fg="#FFFFFF",
+        bg="#FFA500",
+        activeforeground="#FFFFFF",
+        activebackground="#CC8400",
+        width=14
+    ).pack(pady=15)
+
+    botao_lotes = tk.Button(
+        janela,
+        text="Simular em lotes",
+        command=lambda:abrir_simulacao_lotes(janela),
+        font=("Calibri", 15, "bold"),
+        fg="#FFFFFF",
+        bg="#FFA500",
+        activeforeground="#FFFFFF",
+        activebackground="#CC8400",
+        width=14
+    )
+    botao_lotes.pack(pady=10)
 
     janela.mainloop()
+
+def abrir_simulacao_lotes(janela):
+    janela_lotes = tk.Toplevel(janela)
+    janela_lotes.title("Simulação em Lotes")
+    janela_lotes.geometry("500x450")
+    janela_lotes.resizable(False, False)
+
+    configurar_tela_lotes(janela_lotes)

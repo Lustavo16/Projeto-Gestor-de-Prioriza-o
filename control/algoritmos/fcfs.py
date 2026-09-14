@@ -1,27 +1,48 @@
-def fcfs(processos, ctx_time=0.5):
-    tempo_atual = 0
-    total_execucao = 0
-    total_espera = 0
-    ultimo_processo = None
+from model.prioridade import Prioridade
 
-    processos_ordenados = sorted(processos, key=lambda p: p.chegada)
-    
-    for processo in processos_ordenados:
-        if processo.chegada > tempo_atual:
-            tempo_atual = processo.chegada        # Adiciona tempo de troca de contexto se necessário
-        if ultimo_processo is not None and ctx_time > 0:
-            # Apenas o processo que está saindo registra a troca de contexto
-            ctx_duracao = ultimo_processo.adicionar_troca_contexto(tempo_atual, tempo_atual + ctx_time)
-            tempo_atual += ctx_duracao
-            
-        tempo_atual += processo.adicionar_processamento(tempo_atual, tempo_atual + processo.duracao)
-        
-        total_execucao += processo.get_turnaround()
-        total_espera += processo.get_espera()
-        
-        ultimo_processo = processo
-        
-    media_espera = total_espera / len(processos)
-    media_execucao = total_execucao / len(processos)
-    
-    return media_espera, media_execucao, "FCFS"
+
+def fcfs(processos, ctx_time=0):
+    tempo_atual = 0
+    ultimo_processo_id = None
+    ctx_time = float(ctx_time)
+
+    # 1. Inicialização dos processos
+    for p in processos:
+        p.tempo_restante = int(p.duracao)
+        p.tempo_executado = 0
+        p.processamentos = []
+
+    # C3: Desempate por chegada e depois por ID
+    processos_ordenados = sorted(processos, key=lambda p: (p.chegada, p.id))
+
+    for escolhido in processos_ordenados:
+        # Se a CPU ficou ociosa, avança o relógio até o ingresso do processo
+        if escolhido.chegada > tempo_atual:
+            tempo_atual = escolhido.chegada
+
+        # C4: Troca de contexto ocorre se a tarefa é diferente da última
+        # inclusive no 1º despacho
+        if escolhido.id != ultimo_processo_id and ctx_time > 0:
+            escolhido.adicionar_troca_contexto(
+                tempo_atual,
+                tempo_atual + ctx_time
+            )
+            tempo_atual += ctx_time
+
+        # Executa o processo até o fim
+        duracao_executada = escolhido.adicionar_processamento(
+            tempo_atual,
+            tempo_atual + escolhido.tempo_restante
+        )
+        tempo_atual += duracao_executada
+
+        ultimo_processo_id = escolhido.id
+
+    # 2. Cálculo das métricas oficiais (C8: tw = tt - tp)
+    if not processos:
+        return 0, 0, "FCFS"
+
+    media_execucao = sum(p.get_turnaround() for p in processos) / len(processos)
+    media_espera = sum(p.get_espera() for p in processos) / len(processos)
+
+    return media_execucao, media_espera, "FCFS"
