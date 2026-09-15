@@ -7,18 +7,18 @@ def round_robin(processos, quantum=2, ctx_time=0):
     if quantum <= ctx_time:
         raise ValueError("No Round-Robin, o quantum deve ser maior que o tempo de troca de contexto.")
 
-    # 1. Inicialização limpa dos processos
+    # Inicialização limpa dos processos
     for p in processos:
         p.tempo_restante = int(p.duracao)
         p.tempo_executado = 0
         p.processamentos = []
 
-    # C3: Desempate inicial por ordem de chegada e depois por ID
+    # Desempate inicial por ordem de chegada e depois por ID
     nao_chegados = sorted(processos, key=lambda p: (p.chegada, p.id))
     fila_prontos = []
 
     while nao_chegados or fila_prontos:
-        # Se a CPU está ociosa, salta direto para a próxima chegada (C10)
+        # Se a CPU está ociosa, salta direto para a próxima chegada
         if not fila_prontos:
             tempo_atual = max(tempo_atual, nao_chegados[0].chegada)
 
@@ -26,11 +26,10 @@ def round_robin(processos, quantum=2, ctx_time=0):
         while nao_chegados and nao_chegados[0].chegada <= tempo_atual:
             fila_prontos.append(nao_chegados.pop(0))
 
-        # 2. Despacha o primeiro processo da fila
+        # Despacha o primeiro processo da fila
         p_atual = fila_prontos.pop(0)
 
-        # 3. Troca de Contexto na tarefa que está ENTRANDO
-        # C4: inclusive no 1º despacho
+        # Troca de Contexto na tarefa que está ENTRANDO
         if p_atual.id != ultimo_processo_id and ctx_time > 0:
             p_atual.adicionar_troca_contexto(tempo_atual, tempo_atual + ctx_time)
             tempo_atual += ctx_time
@@ -39,8 +38,7 @@ def round_robin(processos, quantum=2, ctx_time=0):
             while nao_chegados and nao_chegados[0].chegada <= tempo_atual:
                 fila_prontos.append(nao_chegados.pop(0))
 
-        # 4. Executa até o limite do quantum
-        # C5: o custo da troca de contexto é descontado da fatia
+        # Executa até o limite do quantum
         if p_atual.id != ultimo_processo_id and ctx_time > 0:
             tempo_rodar = min(p_atual.tempo_restante, quantum - ctx_time)
         else:
@@ -49,17 +47,17 @@ def round_robin(processos, quantum=2, ctx_time=0):
         p_atual.adicionar_processamento(tempo_atual, tempo_atual + tempo_rodar)
         tempo_atual += tempo_rodar
 
-        # 5. Processos que chegaram durante a execução entram na fila antes da reinserção
+        # Processos que chegaram durante a execução entram na fila antes da reinserção
         while nao_chegados and nao_chegados[0].chegada <= tempo_atual:
             fila_prontos.append(nao_chegados.pop(0))
 
-        # 6. Se ainda resta tempo de execução, volta para o fim da fila de prontos
+        # Se ainda resta tempo de execução, volta para o fim da fila de prontos
         if p_atual.tempo_restante > 0:
             fila_prontos.append(p_atual)
 
         ultimo_processo_id = p_atual.id
 
-    # 7. Cálculo das métricas oficiais (C8: tw = tt - tp)
+    # 7. Cálculo das métricas oficiais
     if not processos:
         return 0, 0, 0, "Round Robin"
 

@@ -8,7 +8,7 @@ def prioridade_cooperativo(processos, ctx_time=0, alpha=0):
     ctx_time = float(ctx_time)
     alpha = float(alpha)
 
-    # 1. Inicialização dos processos
+    # Inicialização dos processos
     for p in processos:
         p.tempo_restante = int(p.duracao)
         p.tempo_executado = 0
@@ -44,7 +44,7 @@ def prioridade_cooperativo(processos, ctx_time=0, alpha=0):
         # Processos que já chegaram
         chegados = [p for p in pendentes if p.chegada <= tempo_atual]
 
-        # CPU ociosa: avança direto para a próxima chegada (C10)
+        # CPU ociosa: avança direto para a próxima chegada
         if not chegados:
             proximas_chegadas = [p.chegada for p in pendentes if p.chegada > tempo_atual]
             if not proximas_chegadas:
@@ -52,7 +52,7 @@ def prioridade_cooperativo(processos, ctx_time=0, alpha=0):
             tempo_atual = min(proximas_chegadas)
             continue
 
-        # 2. Calcula a prioridade efetiva usando Aging
+        # Calcula a prioridade efetiva usando Aging
         for p in chegados:
             tempo_espera = tempo_atual - p.inicio_espera
             p.prioridade_efetiva = (
@@ -60,8 +60,7 @@ def prioridade_cooperativo(processos, ctx_time=0, alpha=0):
                 + (tempo_espera * alpha)
             )
 
-        # 3. Escolha por prioridade efetiva (C2) e
-        # desempate por chegada e ID (C3)
+        # Escolha por prioridade efetiva 
         escolhido = max(
             chegados,
             key=lambda p: (
@@ -71,8 +70,7 @@ def prioridade_cooperativo(processos, ctx_time=0, alpha=0):
             )
         )
 
-        # 4. Troca de Contexto na tarefa que está ENTRANDO
-        # C4: inclusive no 1º despacho
+        # Troca de Contexto
         if escolhido.id != ultimo_processo_id and ctx_time > 0:
             escolhido.adicionar_troca_contexto(
                 tempo_atual,
@@ -80,11 +78,11 @@ def prioridade_cooperativo(processos, ctx_time=0, alpha=0):
             )
             tempo_atual += ctx_time
 
-        # 5. Ao receber o processador, o Aging é resetado
+        # Ao receber o processador, o Aging é resetado
         escolhido.prioridade_efetiva = escolhido.prioridade_base
         escolhido.inicio_espera = tempo_atual
 
-        # 6. Execução cooperativa (não preemptiva)
+        # Execução cooperativa
         while escolhido.tempo_restante > 0:
             vai_entrar_na_sc = (
                 escolhido.sc_inicio is not None
@@ -97,15 +95,13 @@ def prioridade_cooperativo(processos, ctx_time=0, alpha=0):
                 dono_recurso = escolhido
 
             # Executa 1 unidade de CPU
-            # adicionar_processamento() já atualiza
-            # tempo_restante e tempo_executado
             duracao_executada = escolhido.adicionar_processamento(
                 tempo_atual,
                 tempo_atual + 1
             )
             tempo_atual += duracao_executada
 
-            # Libera o recurso ao concluir a seção crítica
+            # Libera o recurso
             if (
                 dono_recurso == escolhido
                 and escolhido.sc_fim is not None
@@ -115,13 +111,13 @@ def prioridade_cooperativo(processos, ctx_time=0, alpha=0):
 
         ultimo_processo_id = escolhido.id
 
-        # 7. Processo concluiu a execução
+        # Processo concluiu a execução
         if escolhido.tempo_restante <= 0:
             if dono_recurso == escolhido:
                 dono_recurso = None
             pendentes.remove(escolhido)
 
-    # 8. Restaura as prioridades base
+    # Restaura as prioridades base
     for p in processos:
         p.prioridade_efetiva = p.prioridade_base
         if hasattr(p.prioridade, "numero"):
@@ -129,7 +125,7 @@ def prioridade_cooperativo(processos, ctx_time=0, alpha=0):
         else:
             p.prioridade = p.prioridade_base
 
-    # 9. Cálculo das métricas oficiais (C8: tw = tt - tp)
+    # Métricas
     if not processos:
         return 0, 0, "Prioridade Cooperativo"
 

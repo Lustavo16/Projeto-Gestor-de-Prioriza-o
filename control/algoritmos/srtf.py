@@ -6,7 +6,7 @@ def srtf(processos, ctx_time=0):
     ultimo_processo_id = None
     ctx_time = float(ctx_time)
 
-    # 1. Inicialização dos processos
+    # Inicialização dos processos
     for p in processos:
         p.tempo_restante = int(p.duracao)
         p.tempo_executado = 0
@@ -18,7 +18,7 @@ def srtf(processos, ctx_time=0):
         # Filtra os processos que já chegaram
         chegados = [p for p in pendentes if p.chegada <= tempo_atual]
 
-        # Se a CPU está ociosa, salta direto para a próxima chegada (C10)
+        # Se a CPU está ociosa, salta direto para a próxima chegada
         if not chegados:
             proximas_chegadas = [p.chegada for p in pendentes if p.chegada > tempo_atual]
             if not proximas_chegadas:
@@ -26,15 +26,13 @@ def srtf(processos, ctx_time=0):
             tempo_atual = min(proximas_chegadas)
             continue
 
-        # 2. Escolha pelo critério SRTF: menor tempo restante,
-        # menor chegada, menor id (C3)
+        # Escolha pelo critério SRTF: menor tempo restante,
         escolhido = min(
             chegados,
             key=lambda p: (p.tempo_restante, p.chegada, p.id)
         )
 
-        # 3. Troca de Contexto na tarefa que está ENTRANDO
-        # C4: inclusive no 1º despacho
+        # Troca de Contexto na tarefa que está ENTRANDO
         if escolhido.id != ultimo_processo_id and ctx_time > 0:
             escolhido.adicionar_troca_contexto(
                 tempo_atual,
@@ -42,8 +40,7 @@ def srtf(processos, ctx_time=0):
             )
             tempo_atual += ctx_time
 
-        # 4. Executa exatamente 1 unidade discreta de tempo
-        # C1 - Preemptivo
+        # Executa exatamente 1 unidade discreta de tempo
         duracao_executada = escolhido.adicionar_processamento(
             tempo_atual,
             tempo_atual + 1
@@ -52,11 +49,11 @@ def srtf(processos, ctx_time=0):
 
         ultimo_processo_id = escolhido.id
 
-        # 5. Remove da lista de pendentes se a tarefa finalizou
+        # Remove da lista de pendentes se a tarefa finalizou
         if escolhido.tempo_restante <= 0:
             pendentes.remove(escolhido)
 
-    # 6. Cálculo das métricas oficiais (C8: tw = tt - tp)
+    # Cálculo das métricas oficiais
     if not processos:
         return 0, 0, "SRTF"
 

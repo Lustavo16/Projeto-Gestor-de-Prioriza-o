@@ -7,6 +7,7 @@ def prioridade_preemptivo(processos, ctx_time=0, alpha=0):
     ctx_time = float(ctx_time)
     alpha = float(alpha)
 
+    # Inicialização dos processos
     for p in processos:
         p.tempo_restante = int(p.duracao)
         p.tempo_executado = 0
@@ -153,8 +154,7 @@ def prioridade_preemptivo(processos, ctx_time=0, alpha=0):
 
             tempo_atual += ctx_time
 
-            # Novas tarefas podem ter chegado durante a troca de contexto.
-            # Elas serão consideradas na próxima decisão.
+            # Novas tarefas podem chegar durante a troca de contexto.
             for p in pendentes:
                 if p.chegada <= tempo_atual:
                     p.bloqueado = False

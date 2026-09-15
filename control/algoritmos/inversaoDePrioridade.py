@@ -7,7 +7,7 @@ def inversao_prioridade(processos, ctx_time=0):
     dono_recurso = None
     ctx_time = float(ctx_time)
 
-    # 1. Inicialização dos processos
+    # Inicialização dos processos
     for p in processos:
         p.tempo_restante = int(p.duracao)
         p.tempo_executado = 0
@@ -35,7 +35,7 @@ def inversao_prioridade(processos, ctx_time=0):
     while pendentes:
         chegados = [p for p in pendentes if p.chegada <= tempo_atual]
 
-        # Se a CPU está ociosa, salta direto para a próxima chegada (C10)
+        # Se a CPU está ociosa, salta direto para a próxima chegada
         if not chegados:
             proximas_chegadas = [p.chegada for p in pendentes if p.chegada > tempo_atual]
             if not proximas_chegadas:
@@ -43,7 +43,7 @@ def inversao_prioridade(processos, ctx_time=0):
             tempo_atual = min(proximas_chegadas)
             continue
 
-        # 2. Liberação do recurso se o detentor terminou ou completou a SC
+        # Liberação do recurso se o detentor terminou ou completou a SC
         if dono_recurso is not None:
             if dono_recurso.tempo_restante <= 0:
                 dono_recurso = None
@@ -53,7 +53,7 @@ def inversao_prioridade(processos, ctx_time=0):
             ):
                 dono_recurso = None
 
-        # 3. Identificação de processos bloqueados disputando o recurso
+        # Identificação de processos bloqueados disputando o recurso
         for p in pendentes:
             p.bloqueado = False
             if (
@@ -65,7 +65,7 @@ def inversao_prioridade(processos, ctx_time=0):
             ):
                 p.bloqueado = True
 
-        # 4. Filtragem de processos aptos
+        # Filtragem de processos aptos
         aptos = [p for p in chegados if not p.bloqueado and p.tempo_restante > 0]
 
         if not aptos:
@@ -86,7 +86,7 @@ def inversao_prioridade(processos, ctx_time=0):
                     f"Dono do recurso: {dono_recurso.id if dono_recurso else None}"
                 )
 
-        # 5. Escolha do processo (C2: maior prioridade, C3: menor chegada e menor ID)
+        # Escolha do processo
         escolhido = max(
             aptos,
             key=lambda p: (
@@ -96,7 +96,7 @@ def inversao_prioridade(processos, ctx_time=0):
             )
         )
 
-        # 6. Alocação do recurso ao ingressar na seção crítica
+        # Alocação do recurso ao ingressar na seção crítica
         vai_entrar_na_sc = (
             escolhido.sc_inicio is not None
             and escolhido.sc_fim is not None
@@ -115,7 +115,7 @@ def inversao_prioridade(processos, ctx_time=0):
             escolhido.bloqueado = True
             continue
 
-        # 7. Troca de Contexto na tarefa que está ENTRANDO (C4: inclusive no 1º despacho)
+        # Troca de Contexto na tarefa que está ENTRANDO
         if escolhido.id != ultimo_processo_id and ctx_time > 0:
             escolhido.adicionar_troca_contexto(
                 tempo_atual,
@@ -123,7 +123,7 @@ def inversao_prioridade(processos, ctx_time=0):
             )
             tempo_atual += ctx_time
 
-        # 8. Executa exatamente 1 unidade discreta de tempo (C1 - Preemptivo)
+        # Executa exatamente 1 unidade discreta de tempo
         inicio = tempo_atual
         fim = tempo_atual + 1
         duracao_executada = escolhido.adicionar_processamento(inicio, fim)
@@ -131,7 +131,7 @@ def inversao_prioridade(processos, ctx_time=0):
 
         ultimo_processo_id = escolhido.id
 
-        # 9. Liberação do recurso se completou a seção crítica
+        # Liberação do recurso se completou a seção crítica
         if dono_recurso == escolhido:
             if (
                 escolhido.sc_fim is not None
@@ -139,14 +139,14 @@ def inversao_prioridade(processos, ctx_time=0):
             ):
                 dono_recurso = None
 
-        # 10. Conclusão do processo
+        # Conclusão do processo
         if escolhido.tempo_restante <= 0:
             if dono_recurso == escolhido:
                 dono_recurso = None
             escolhido.bloqueado = False
             pendentes.remove(escolhido)
 
-    # 11. Cálculo das métricas oficiais (C8: tw = tt - tp)
+    # Métricas
     if not processos:
         return 0, 0, "Inversão de Prioridade"
 

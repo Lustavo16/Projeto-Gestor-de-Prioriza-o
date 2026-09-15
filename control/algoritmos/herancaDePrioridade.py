@@ -7,7 +7,7 @@ def heranca_prioridade(processos, ctx_time=0, aging_habilitado=False):
     dono_id = None
     ctx_time = float(ctx_time)
 
-    # 1. Inicialização dos processos
+    # Inicialização dos processos
     for p in processos:
         p.tempo_restante = int(p.duracao)
         p.tempo_executado = 0
@@ -44,7 +44,7 @@ def heranca_prioridade(processos, ctx_time=0, aging_habilitado=False):
     while pendentes:
         chegados = [p for p in pendentes if p.chegada <= tempo_atual]
 
-        # Se a CPU está ociosa, salta direto para a próxima chegada (C10)
+        # Se a CPU está ociosa, salta direto para a próxima chegada
         if not chegados:
             proximas_chegadas = [p.chegada for p in pendentes if p.chegada > tempo_atual]
             if not proximas_chegadas:
@@ -52,7 +52,7 @@ def heranca_prioridade(processos, ctx_time=0, aging_habilitado=False):
             tempo_atual = min(proximas_chegadas)
             continue
 
-        # 2. Herança de prioridade e identificação de bloqueios
+        # Herança de prioridade e identificação de bloqueios
         bloqueados_ids = set()
         for p in processos:
             p.prioridade_efetiva = p.prioridade_base + p.bonus_aging
@@ -72,7 +72,7 @@ def heranca_prioridade(processos, ctx_time=0, aging_habilitado=False):
                         if p.prioridade_base > dono.prioridade_efetiva:
                             dono.prioridade_efetiva = p.prioridade_base
 
-        # 3. Filtragem de processos aptos
+        # Filtragem de processos aptos
         aptos = [p for p in chegados if p.id not in bloqueados_ids and not p.terminou()]
 
         if not aptos:
@@ -95,19 +95,19 @@ def heranca_prioridade(processos, ctx_time=0, aging_habilitado=False):
                     f"Dono do recurso: {dono_id}"
                 )
 
-        # 4. Escolha do processo (C2: maior prioridade, C3: menor chegada e menor ID)
+        # Escolha do processo
         escolhido = max(aptos, key=lambda p: (p.prioridade_efetiva, -p.chegada, -p.id))
 
-        # 5. Entrada na seção crítica
+        # Entrada na seção crítica
         if escolhido.precisa_recurso():
             dono_id = escolhido.id
 
-        # 6. Troca de Contexto na tarefa que está ENTRANDO (C4: inclusive no 1º despacho)
+        # Troca de Contexto na tarefa que está ENTRANDO
         if escolhido.id != ultimo_processo_id and ctx_time > 0:
             escolhido.adicionar_troca_contexto(tempo_atual, tempo_atual + ctx_time)
             tempo_atual += ctx_time
 
-        # 7. Executa exatamente 1 unidade discreta de tempo (C1 - Preemptivo)
+        # Executa exatamente 1 unidade discreta de tempo
         inicio_execucao = tempo_atual
         fim_execucao = tempo_atual + 1
         duracao_executada = escolhido.adicionar_processamento(inicio_execucao, fim_execucao)
@@ -115,19 +115,19 @@ def heranca_prioridade(processos, ctx_time=0, aging_habilitado=False):
 
         ultimo_processo_id = escolhido.id
 
-        # 8. Liberação do recurso ao fim da seção crítica
+        # Liberação do recurso ao fim da seção crítica
         if dono_id == escolhido.id:
             if escolhido.sc_fim is not None and escolhido.tempo_executado >= escolhido.sc_fim:
                 dono_id = None
 
-        # 9. Conclusão do processo
+        # Conclusão do processo
         if escolhido.terminou():
             if dono_id == escolhido.id:
                 dono_id = None
             escolhido.bloqueado = False
             pendentes.remove(escolhido)
 
-    # 10. Restauração das prioridades originais
+    # Restauração das prioridades originais
     for p in processos:
         p.prioridade_efetiva = p.prioridade_base
         if hasattr(p.prioridade, "numero"):
@@ -136,7 +136,7 @@ def heranca_prioridade(processos, ctx_time=0, aging_habilitado=False):
             p.prioridade = p.prioridade_base
         p.bloqueado = False
 
-    # 11. Cálculo das métricas oficiais (C8: tw = tt - tp)
+    # Métricas
     if not processos:
         return 0, 0, "Herança de Prioridade"
 

@@ -7,7 +7,7 @@ def teto_prioridade(processos, ctx_time=0):
     dono_id = None
     ctx_time = float(ctx_time)
 
-    # 1. Inicialização dos processos
+    # Inicialização dos processos
     for p in processos:
         p.tempo_restante = int(p.duracao)
         p.tempo_executado = 0
@@ -33,7 +33,7 @@ def teto_prioridade(processos, ctx_time=0):
             p.sc_duracao = None
             p.sc_fim = None
 
-    # Cálculo do Teto do Recurso R (R7):
+    # Cálculo do Teto do Recurso R
     # Maior prioridade base entre todas as tarefas que utilizam o recurso
     tarefas_com_sc = [p for p in processos if p.sc_inicio is not None]
     teto_recurso = max((p.prioridade_base for p in tarefas_com_sc), default=0)
@@ -43,7 +43,7 @@ def teto_prioridade(processos, ctx_time=0):
     while pendentes:
         chegados = [p for p in pendentes if p.chegada <= tempo_atual]
 
-        # Se a CPU está ociosa, salta direto para a próxima chegada (C10)
+        # Se a CPU está ociosa, salta direto para a próxima chegada
         if not chegados:
             proximas_chegadas = [p.chegada for p in pendentes if p.chegada > tempo_atual]
             if not proximas_chegadas:
@@ -51,12 +51,12 @@ def teto_prioridade(processos, ctx_time=0):
             tempo_atual = min(proximas_chegadas)
             continue
 
-        # 2. Reseta o estado de bloqueio e atualiza a prioridade efetiva
+        # Reseta o estado de bloqueio e atualiza a prioridade efetiva
         bloqueados_ids = set()
         for p in processos:
             p.bloqueado = False
 
-            # Se o processo detém o recurso, sua prioridade permanece elevada ao teto (R7)
+            # Se o processo detém o recurso, sua prioridade permanece elevada ao teto
             if dono_id is not None and p.id == dono_id:
                 p.prioridade_efetiva = max(p.prioridade_base, teto_recurso)
             else:
@@ -76,7 +76,7 @@ def teto_prioridade(processos, ctx_time=0):
                         bloqueados_ids.add(p.id)
                         p.bloqueado = True
 
-        # 3. Filtragem de processos aptos
+        # Filtragem de processos aptos
         aptos = [p for p in chegados if p.id not in bloqueados_ids and not p.terminou()]
 
         if not aptos:
@@ -102,20 +102,20 @@ def teto_prioridade(processos, ctx_time=0):
                     f"Dono do recurso: {dono_id}"
                 )
 
-        # 4. Escolha do processo (C2: maior prioridade, C3: menor chegada e menor ID)
+        # Escolha do processo
         escolhido = max(aptos, key=lambda p: (p.prioridade_efetiva, -p.chegada, -p.id))
 
-        # 5. Entrada na seção crítica e elevação imediata ao Teto (R7)
+        # Entrada na seção crítica e elevação imediata ao Teto
         if escolhido.precisa_recurso():
             dono_id = escolhido.id
             escolhido.prioridade_efetiva = max(escolhido.prioridade_base, teto_recurso)
 
-        # 6. Troca de Contexto na tarefa que está ENTRANDO (C4: inclusive no 1º despacho)
+        # Troca de Contexto na tarefa que está entrando
         if escolhido.id != ultimo_processo_id and ctx_time > 0:
             escolhido.adicionar_troca_contexto(tempo_atual, tempo_atual + ctx_time)
             tempo_atual += ctx_time
 
-        # 7. Executa exatamente 1 unidade discreta de tempo (C1 - Preemptivo)
+        # Executa exatamente 1 unidade discreta de tempo
         inicio_execucao = tempo_atual
         fim_execucao = tempo_atual + 1
         duracao_executada = escolhido.adicionar_processamento(inicio_execucao, fim_execucao)
@@ -123,7 +123,7 @@ def teto_prioridade(processos, ctx_time=0):
 
         ultimo_processo_id = escolhido.id
 
-        # 8. Liberação do recurso ao fim da seção crítica e restauração de prioridade
+        # Liberação do recurso ao fim da seção crítica e restauração de prioridade
         if dono_id == escolhido.id:
             if escolhido.sc_fim is not None and escolhido.tempo_executado >= escolhido.sc_fim:
                 escolhido.prioridade_efetiva = escolhido.prioridade_base
@@ -142,7 +142,7 @@ def teto_prioridade(processos, ctx_time=0):
             escolhido.bloqueado = False
             pendentes.remove(escolhido)
 
-    # 10. Restauração final das prioridades originais
+    # Restauração final das prioridades originais
     for p in processos:
         p.prioridade_efetiva = p.prioridade_base
 
@@ -153,7 +153,7 @@ def teto_prioridade(processos, ctx_time=0):
 
         p.bloqueado = False
 
-    # 11. Cálculo das métricas oficiais (C8: tw = tt - tp)
+    # Cálculo das métricas oficiais
     if not processos:
         return 0, 0, "Teto de Prioridade"
 

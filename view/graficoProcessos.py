@@ -49,7 +49,7 @@ def grafico_processos(
 
     ax.set_xlim(0, tempo_maximo)
 
-    # Eixo X com marcas inteiras conforme convenção C1
+    # Eixo X com marcas inteiras
     ax.set_xticks(
         range(0, int(tempo_maximo) + 1)
     )
@@ -79,7 +79,7 @@ def grafico_processos(
                     edgecolor='#1E90FF'
                 )
 
-                # Marca a seção crítica com barra superior vermelha se estiver na posse do recurso (C7)
+                # Marca a seção crítica com barra superior vermelha se estiver na posse do recurso
                 if getattr(
                     processo,
                     'sc_inicio',

@@ -19,7 +19,7 @@ def adicionar_processo():
         duracao = int(entrada_duracao.get().strip())
         prioridade_num = int(entrada_prioridade.get().strip())
 
-        # Leitura dos campos opcionais de Seção Crítica (C7)
+        # Leitura dos campos opcionais de Seção Crítica
         sc_inicio_str = entrada_sc_inicio.get().strip()
         sc_duracao_str = entrada_sc_duracao.get().strip()
 
@@ -499,7 +499,7 @@ def form_submit():
             else 0.0
         )
 
-        # R8: lê o valor do Alpha do Aging
+        # Lê o valor do Alpha do Aging
         alpha = (
             float(alpha_entry.get().strip())
             if alpha_entry.get().strip()
@@ -513,8 +513,6 @@ def form_submit():
             )
             return
 
-        # R4: quantum só faz sentido no Round-Robin
-        # e deve ser maior que a troca de contexto
         if algoritmo == 3 and quantum <= ctx_time:
             messagebox.showerror(
                 "Erro",
@@ -522,10 +520,6 @@ def form_submit():
             )
             return
 
-        # R8:
-        # O Aging será passado para o controller.
-        # R8:
-        # O Alpha do Aging será passado para o controller.
         resultado = simular_escalonamento(
             processos_submit,
             algoritmo,
@@ -561,17 +555,12 @@ def centralizar_janela(janela, largura, altura):
 
 
 def habilitar_quantum():
-    # Exibe quantum apenas quando Round-Robin (opção 3) for selecionado (R4)
     if algoritmo_var.get() == 3:
         quantum_label.pack(padx=20, pady=2)
         quantum_entry.pack(padx=20, pady=2)
     else:
         quantum_label.pack_forget()
         quantum_entry.pack_forget()
-
-    # ==========================================================
-    # R8 - HABILITAÇÃO DO AGING
-    # ==========================================================
 
     if algoritmo_var.get() in (5, 6):
         alpha_label.pack(pady=2)
@@ -667,7 +656,7 @@ def criar_janela():
     )
     entrada_prioridade.grid(row=1, column=2, padx=4, pady=3)
 
-    # Campos Opcionais de Seção Crítica (C7 e R2)
+    # Campos Opcionais de Seção Crítica
     tk.Label(
         input_form_frame,
         text="Início SC:",
@@ -733,11 +722,9 @@ def criar_janela():
         bg="#44B649"
     ).grid(row=0, column=2, padx=5)
 
-    # Container para manter a Listbox e os botões lado a lado
     container_tabela = tk.Frame(janela, bg="white")
     container_tabela.pack(padx=10, pady=6)
 
-    # 1. Listbox posicionada à esquerda
     lista_processos = tk.Listbox(
         container_tabela,
         width=70,
@@ -748,11 +735,9 @@ def criar_janela():
     )
     lista_processos.pack(side="left", padx=(0, 10))
 
-    # 2. Frame para empilhar os botões à direita da lista
     botoes_csv_frame = tk.Frame(container_tabela, bg="white")
     botoes_csv_frame.pack(side="left", fill="y", pady=(10, 0))
 
-    # Botão Importar (topo)
     tk.Button(
         botoes_csv_frame,
         text="Importar CSV",
@@ -763,7 +748,6 @@ def criar_janela():
         width=12
     ).pack(pady=(0, 5), fill="x")
 
-    # Botão Exportar (embaixo)
     tk.Button(
         botoes_csv_frame,
         text="Exportar CSV",
@@ -773,10 +757,6 @@ def criar_janela():
         bg="#4682B4",
         width=12
     ).pack(pady=(5, 0), fill="x")
-
-    # ==========================================================
-    # R9 - GERADOR DE CENÁRIOS
-    # ==========================================================
 
     gerador_label = tk.Label(
         janela,
@@ -913,7 +893,6 @@ def criar_janela():
     )
     radio_frame.pack(pady=5)
 
-    # Lista completa incluindo o Teto de Prioridade (R7)
     tk.Radiobutton(
         radio_frame,
         text="1. FCFS",
@@ -1004,10 +983,6 @@ def criar_janela():
         bg="#FFFFFF"
     ).grid(row=4, column=1, sticky="w", padx=25)
 
-    # ==========================================================
-    # R8 - AGING
-    # ==========================================================
-
     alpha_label = tk.Label(
         janela,
         text="Alpha do Aging:",
@@ -1025,14 +1000,6 @@ def criar_janela():
 
     alpha_entry.insert(0, "0")
 
-    # Não fazemos .pack() aqui.
-    # O campo só aparece quando um algoritmo de prioridade
-    # for selecionado.
-
-    # ==========================================================
-    # ROUND ROBIN
-    # ==========================================================
-
     quantum_label = tk.Label(
         janela,
         text="Quantum para Round Robin:",
@@ -1049,10 +1016,6 @@ def criar_janela():
     )
 
     quantum_entry.insert(0, "2")
-
-    # ==========================================================
-    # TROCA DE CONTEXTO
-    # ==========================================================
 
     ctx_label = tk.Label(
         janela,
