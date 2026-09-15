@@ -1,6 +1,7 @@
 import copy
 import tkinter as tk
-from tkinter import messagebox, ttk
+import csv
+from tkinter import filedialog, messagebox, ttk
 
 from control import simular_escalonamento
 from model import Processo
@@ -132,6 +133,241 @@ def editar_processo():
 
         lista_processos.delete(index_selecionado)
         processos.pop(index_selecionado)
+
+def exportar_processos():
+    if not processos:
+        messagebox.showwarning(
+            "Aviso",
+            "Não há processos para exportar."
+        )
+        return
+
+    caminho = filedialog.asksaveasfilename(
+        title="Exportar tarefas",
+        defaultextension=".csv",
+        filetypes=[
+            ("Arquivo CSV", "*.csv"),
+            ("Todos os arquivos", "*.*")
+        ]
+    )
+
+    if not caminho:
+        return
+
+    try:
+        with open(
+            caminho,
+            "w",
+            newline="",
+            encoding="utf-8-sig"
+        ) as arquivo:
+            escritor = csv.writer(arquivo)
+
+            escritor.writerow([
+                "id",
+                "chegada",
+                "duracao",
+                "prioridade",
+                "sc_inicio",
+                "sc_duracao"
+            ])
+
+            for processo in processos:
+                prioridade_num = (
+                    processo.prioridade.numero
+                    if hasattr(processo.prioridade, "numero")
+                    else processo.prioridade
+                )
+
+                escritor.writerow([
+                    processo.id,
+                    processo.chegada,
+                    processo.duracao,
+                    prioridade_num,
+                    getattr(processo, "sc_inicio", None)
+                    if getattr(processo, "sc_inicio", None) is not None
+                    else "",
+                    getattr(processo, "sc_duracao", None)
+                    if getattr(processo, "sc_duracao", None) is not None
+                    else ""
+                ])
+
+        messagebox.showinfo(
+            "Exportação concluída",
+            "A lista de tarefas foi exportada com sucesso."
+        )
+
+    except Exception as e:
+        messagebox.showerror(
+            "Erro",
+            f"Não foi possível exportar as tarefas.\n\n{e}"
+        )
+
+
+def importar_processos():
+    caminho = filedialog.askopenfilename(
+        title="Importar tarefas",
+        filetypes=[
+            ("Arquivo CSV", "*.csv"),
+            ("Todos os arquivos", "*.*")
+        ]
+    )
+
+    if not caminho:
+        return
+
+    try:
+        novos_processos = []
+
+        with open(
+            caminho,
+            "r",
+            newline="",
+            encoding="utf-8-sig"
+        ) as arquivo:
+            leitor = csv.DictReader(arquivo)
+
+            campos_obrigatorios = {
+                "id",
+                "chegada",
+                "duracao",
+                "prioridade",
+                "sc_inicio",
+                "sc_duracao"
+            }
+
+            if not campos_obrigatorios.issubset(
+                set(leitor.fieldnames or [])
+            ):
+                raise ValueError(
+                    "O arquivo CSV não possui o formato esperado."
+                )
+
+            for linha_numero, linha in enumerate(leitor, start=2):
+                try:
+                    processo_id = int(linha["id"])
+                    chegada = int(linha["chegada"])
+                    duracao = int(linha["duracao"])
+                    prioridade_num = int(linha["prioridade"])
+
+                    sc_inicio_str = linha["sc_inicio"].strip()
+                    sc_duracao_str = linha["sc_duracao"].strip()
+
+                    sc_inicio = None
+                    sc_duracao = None
+
+                    if sc_inicio_str or sc_duracao_str:
+                        if not (
+                            sc_inicio_str
+                            and sc_duracao_str
+                        ):
+                            raise ValueError(
+                                "Início e duração da SC devem "
+                                "ser informados juntos."
+                            )
+
+                        sc_inicio = int(sc_inicio_str)
+                        sc_duracao = int(sc_duracao_str)
+
+                        if (
+                            sc_inicio < 0
+                            or sc_duracao <= 0
+                            or sc_inicio + sc_duracao > duracao
+                        ):
+                            raise ValueError(
+                                "A seção crítica é inválida "
+                                "ou ultrapassa a duração."
+                            )
+
+                    if processo_id <= 0:
+                        raise ValueError(
+                            "O ID deve ser maior que zero."
+                        )
+
+                    if chegada < 0:
+                        raise ValueError(
+                            "A chegada não pode ser negativa."
+                        )
+
+                    if duracao <= 0:
+                        raise ValueError(
+                            "A duração deve ser maior que zero."
+                        )
+
+                    novos_processos.append(
+                        Processo(
+                            processo_id,
+                            chegada,
+                            duracao,
+                            Prioridade(prioridade_num),
+                            sc_inicio=sc_inicio,
+                            sc_duracao=sc_duracao
+                        )
+                    )
+
+                except (ValueError, TypeError) as e:
+                    raise ValueError(
+                        f"Erro na linha {linha_numero}: {e}"
+                    )
+
+        if not novos_processos:
+            messagebox.showwarning(
+                "Aviso",
+                "O arquivo não possui tarefas."
+            )
+            return
+
+        if processos:
+            confirmar = messagebox.askyesno(
+                "Importar tarefas",
+                "Os processos atuais serão substituídos. "
+                "Deseja continuar?"
+            )
+
+            if not confirmar:
+                return
+
+        processos.clear()
+        processos.extend(novos_processos)
+
+        lista_processos.delete(
+            0,
+            tk.END
+        )
+
+        for processo in processos:
+            prioridade_num = (
+                processo.prioridade.numero
+                if hasattr(processo.prioridade, "numero")
+                else processo.prioridade
+            )
+
+            sc_texto = (
+                f", SC: [{processo.sc_inicio}, "
+                f"{processo.sc_inicio + processo.sc_duracao})"
+                if getattr(processo, "sc_inicio", None) is not None
+                else ""
+            )
+
+            lista_processos.insert(
+                tk.END,
+                f"ID: {processo.id}, "
+                f"Chegada: {processo.chegada}, "
+                f"Duração: {processo.duracao}, "
+                f"Prioridade: {prioridade_num}"
+                f"{sc_texto}"
+            )
+
+        messagebox.showinfo(
+            "Importação concluída",
+            f"{len(novos_processos)} tarefa(s) importada(s) com sucesso."
+        )
+
+    except Exception as e:
+        messagebox.showerror(
+            "Erro",
+            f"Não foi possível importar as tarefas.\n\n{e}"
+        )
 
 def gerar_cenario_interface():
     try:
@@ -497,18 +733,46 @@ def criar_janela():
         bg="#44B649"
     ).grid(row=0, column=2, padx=5)
 
+    # Container para manter a Listbox e os botões lado a lado
+    container_tabela = tk.Frame(janela, bg="white")
+    container_tabela.pack(padx=10, pady=6)
+
+    # 1. Listbox posicionada à esquerda
     lista_processos = tk.Listbox(
-        janela,
-        width=65,
+        container_tabela,
+        width=70,
         height=5,
         bd=2,
         font=("Calibri", 11),
         justify="center"
     )
-    lista_processos.pack(
-        padx=10,
-        pady=6
-    )
+    lista_processos.pack(side="left", padx=(0, 10))
+
+    # 2. Frame para empilhar os botões à direita da lista
+    botoes_csv_frame = tk.Frame(container_tabela, bg="white")
+    botoes_csv_frame.pack(side="left", fill="y", pady=(10, 0))
+
+    # Botão Importar (topo)
+    tk.Button(
+        botoes_csv_frame,
+        text="Importar CSV",
+        command=importar_processos,
+        font=("Calibri", 11),
+        fg="#FFFFFF",
+        bg="#6A5ACD",
+        width=12
+    ).pack(pady=(0, 5), fill="x")
+
+    # Botão Exportar (embaixo)
+    tk.Button(
+        botoes_csv_frame,
+        text="Exportar CSV",
+        command=exportar_processos,
+        font=("Calibri", 11),
+        fg="#FFFFFF",
+        bg="#4682B4",
+        width=12
+    ).pack(pady=(5, 0), fill="x")
 
     # ==========================================================
     # R9 - GERADOR DE CENÁRIOS

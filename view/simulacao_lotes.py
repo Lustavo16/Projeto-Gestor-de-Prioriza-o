@@ -22,7 +22,7 @@ def abrir_resultados(janela_lotes, resultados):
     janela_resultados.geometry("750x400")
     janela_resultados.resizable(False, False)
 
-    centralizar_janela(janela_resultados, 1200, 400)
+    centralizar_janela(janela_resultados, 1200, 350)
 
     titulo = tk.Label(
         janela_resultados,
@@ -203,7 +203,7 @@ def configurar_tela_lotes(janela):
     ).grid(row=7, column=0, padx=10, pady=8, sticky="w")
 
     entrada_alpha = tk.Entry(frame_parametros, width=10)
-    entrada_alpha.insert(0, "2")
+    entrada_alpha.insert(0, "0")
     entrada_alpha.grid(row=7, column=1, padx=10, pady=8)
 
     def executar():
