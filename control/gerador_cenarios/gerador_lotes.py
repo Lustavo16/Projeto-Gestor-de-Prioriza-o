@@ -15,12 +15,12 @@ def executar_lote(
     alpha=0
 ):
     resultados = {
-        1: {"nome": "FCFS", "turnaround": [], "espera": []},
-        2: {"nome": "SJF", "turnaround": [], "espera": []},
-        3: {"nome": "Round Robin", "turnaround": [], "espera": []},
-        4: {"nome": "SRTF", "turnaround": [], "espera": []},
-        5: {"nome": "Prioridade Cooperativa", "turnaround": [], "espera": []},
-        6: {"nome": "Prioridade Preemptiva", "turnaround": [], "espera": []}
+        1: {"nome": "FCFS", "turnaround": [], "espera": [], "primeira_execucao": []},
+        2: {"nome": "SJF", "turnaround": [], "espera": [], "primeira_execucao": []},
+        3: {"nome": "Round Robin", "turnaround": [], "espera": [], "primeira_execucao": []},
+        4: {"nome": "SRTF", "turnaround": [], "espera": [], "primeira_execucao": []},
+        5: {"nome": "Prioridade Cooperativa", "turnaround": [], "espera": [], "primeira_execucao": []},
+        6: {"nome": "Prioridade Preemptiva", "turnaround": [], "espera": [], "primeira_execucao": []}
     }
 
     for numero_cenario in range(quantidade_cenarios):
@@ -44,10 +44,19 @@ def executar_lote(
                 alpha
             )
 
-            media_execucao, media_espera, nome_processo = resultado
+            media_execucao, media_espera, media_primeira_execucao, nome_processo = resultado
 
             resultados[algoritmo]["turnaround"].append(media_execucao)
             resultados[algoritmo]["espera"].append(media_espera)
+            resultados[algoritmo]["primeira_execucao"].append(media_primeira_execucao)
+
+            """
+            print(
+                resultados[algoritmo]["nome"],
+                "T1 média:",
+                media_primeira_execucao
+            )
+            """
 
     for algoritmo in resultados:
 
@@ -59,6 +68,11 @@ def executar_lote(
         resultados[algoritmo]["espera_media"] = (
             sum(resultados[algoritmo]["espera"])
             / len(resultados[algoritmo]["espera"])
+        )
+
+        resultados[algoritmo]["media_primeira_execucao"] = (
+            sum(resultados[algoritmo]["primeira_execucao"])
+            / len(resultados[algoritmo]["primeira_execucao"])
         )
 
     return resultados

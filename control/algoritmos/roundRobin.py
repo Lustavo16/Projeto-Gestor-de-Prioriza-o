@@ -4,6 +4,9 @@ def round_robin(processos, quantum=2, ctx_time=0):
     quantum = int(quantum)
     ctx_time = float(ctx_time)
 
+    if quantum <= ctx_time:
+        raise ValueError("No Round-Robin, o quantum deve ser maior que o tempo de troca de contexto.")
+
     # 1. Inicialização limpa dos processos
     for p in processos:
         p.tempo_restante = int(p.duracao)
@@ -26,13 +29,23 @@ def round_robin(processos, quantum=2, ctx_time=0):
         # 2. Despacha o primeiro processo da fila
         p_atual = fila_prontos.pop(0)
 
-        # 3. Troca de Contexto na tarefa que está ENTRANDO (C4: inclusive no 1º despacho)
+        # 3. Troca de Contexto na tarefa que está ENTRANDO
+        # C4: inclusive no 1º despacho
         if p_atual.id != ultimo_processo_id and ctx_time > 0:
             p_atual.adicionar_troca_contexto(tempo_atual, tempo_atual + ctx_time)
             tempo_atual += ctx_time
 
+            # Processos que chegaram durante a troca de contexto entram na fila
+            while nao_chegados and nao_chegados[0].chegada <= tempo_atual:
+                fila_prontos.append(nao_chegados.pop(0))
+
         # 4. Executa até o limite do quantum
-        tempo_rodar = min(p_atual.tempo_restante, quantum)
+        # C5: o custo da troca de contexto é descontado da fatia
+        if p_atual.id != ultimo_processo_id and ctx_time > 0:
+            tempo_rodar = min(p_atual.tempo_restante, quantum - ctx_time)
+        else:
+            tempo_rodar = min(p_atual.tempo_restante, quantum)
+
         p_atual.adicionar_processamento(tempo_atual, tempo_atual + tempo_rodar)
         tempo_atual += tempo_rodar
 
@@ -48,9 +61,10 @@ def round_robin(processos, quantum=2, ctx_time=0):
 
     # 7. Cálculo das métricas oficiais (C8: tw = tt - tp)
     if not processos:
-        return 0, 0, "Round Robin"
+        return 0, 0, 0, "Round Robin"
 
     media_execucao = sum(p.get_turnaround() for p in processos) / len(processos)
     media_espera = sum(p.get_espera() for p in processos) / len(processos)
+    media_primeria_execucao = sum(p.get_tempo_primeira_execucao() for p in processos) / len(processos)
 
-    return media_execucao, media_espera, "Round Robin"
+    return media_execucao, media_espera, media_primeria_execucao, "Round Robin"

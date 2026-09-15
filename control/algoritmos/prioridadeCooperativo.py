@@ -135,5 +135,6 @@ def prioridade_cooperativo(processos, ctx_time=0, alpha=0):
 
     media_execucao = sum(p.get_turnaround() for p in processos) / len(processos)
     media_espera = sum(p.get_espera() for p in processos) / len(processos)
+    media_primeria_execucao = sum(p.get_tempo_primeira_execucao() for p in processos) / len(processos)
 
-    return media_execucao, media_espera, "Prioridade Cooperativo"
+    return media_execucao, media_espera, media_primeria_execucao, "Prioridade Cooperativo"

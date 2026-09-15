@@ -142,6 +142,7 @@ def heranca_prioridade(processos, ctx_time=0, aging_habilitado=False):
 
     media_execucao = sum(p.get_turnaround() for p in processos) / len(processos)
     media_espera = sum(p.get_espera() for p in processos) / len(processos)
+    media_primeria_execucao = sum(p.get_tempo_primeira_execucao() for p in processos) / len(processos)
 
     # Ordem padronizada com a interface: (Tt, Tw, Nome)
-    return media_execucao, media_espera, "Herança de Prioridade"
+    return media_execucao, media_espera, media_primeria_execucao, "Herança de Prioridade"

@@ -20,55 +20,55 @@ def simular_escalonamento(
     alpha = float(alpha)
 
     if algoritmo == 1:
-        media_execucao, media_espera, nome_processo = fcfs(
+        media_execucao, media_espera, media_primeira_execucao, nome_processo = fcfs(
             processos, ctx_time
         )
 
     elif algoritmo == 2:
-        media_execucao, media_espera, nome_processo = sjf(
+        media_execucao, media_espera, media_primeira_execucao, nome_processo = sjf(
             processos, ctx_time
         )
 
     elif algoritmo == 3:
         quantum = int(quantum_entry)
 
-        media_execucao, media_espera, nome_processo = round_robin(
+        media_execucao, media_espera, media_primeira_execucao, nome_processo = round_robin(
             processos, quantum, ctx_time
         )
 
     elif algoritmo == 4:
-        media_execucao, media_espera, nome_processo = srtf(
+        media_execucao, media_espera, media_primeira_execucao, nome_processo = srtf(
             processos, ctx_time
         )
 
     elif algoritmo == 5:
-        media_execucao, media_espera, nome_processo = prioridade_cooperativo(
+        media_execucao, media_espera, media_primeira_execucao, nome_processo = prioridade_cooperativo(
             processos,
             ctx_time,
             alpha
         )
 
     elif algoritmo == 6:
-        media_execucao, media_espera, nome_processo = prioridade_preemptivo(
+        media_execucao, media_espera, media_primeira_execucao, nome_processo = prioridade_preemptivo(
             processos,
             ctx_time,
             alpha
         )
 
     elif algoritmo == 7:
-        media_execucao, media_espera, nome_processo = inversaoDePrioridade.inversao_prioridade(
+        media_execucao, media_espera, media_primeira_execucao, nome_processo = inversaoDePrioridade.inversao_prioridade(
             processos,
             ctx_time
         )
 
     elif algoritmo == 8:
-        media_execucao, media_espera, nome_processo = herancaDePrioridade.heranca_prioridade(
+        media_execucao, media_espera, media_primeira_execucao, nome_processo = herancaDePrioridade.heranca_prioridade(
             processos,
             ctx_time
         )
 
     elif algoritmo == 9:
-        media_execucao, media_espera, nome_processo = tetoDePrioridade.teto_prioridade(
+        media_execucao, media_espera, media_primeira_execucao, nome_processo = tetoDePrioridade.teto_prioridade(
             processos,
             ctx_time
         )
@@ -76,4 +76,4 @@ def simular_escalonamento(
     else:
         raise Exception("Selecione um algoritmo válido.")
 
-    return media_execucao, media_espera, nome_processo
+    return media_execucao, media_espera, media_primeira_execucao, nome_processo

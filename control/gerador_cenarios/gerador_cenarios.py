@@ -4,13 +4,13 @@ from model.processo import Processo
 from model.prioridade import Prioridade
 
 
-def gerar_cenario(quantidade):
+def gerar_cenario(quantidade, chegada_max, duracao_max, prioridade_max):
     processos = []
 
     for i in range(1, quantidade + 1):
-        chegada = random.randint(0, 8)
-        duracao = random.randint(1, 6)
-        prioridade = random.randint(1, 5)
+        chegada = random.randint(0, chegada_max)
+        duracao = random.randint(1, duracao_max)
+        prioridade = random.randint(1, prioridade_max)
 
         processo = Processo(
             i,
@@ -21,10 +21,6 @@ def gerar_cenario(quantidade):
 
         processos.append(processo)
 
-    processos.sort(
-        key=lambda p: (
-            p.id
-        )
-    )
+    processos.sort(key=lambda p: p.id)
 
     return processos

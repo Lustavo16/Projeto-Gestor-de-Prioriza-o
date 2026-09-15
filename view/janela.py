@@ -139,10 +139,43 @@ def gerar_cenario_interface():
             quantidade_cenario_entry.get().strip()
         )
 
+        chegada_max = int(
+            chegada_max_entry.get().strip()
+        )
+
+        duracao_max = int(
+            duracao_max_entry.get().strip()
+        )
+
+        prioridade_max = int(
+            prioridade_max_entry.get().strip()
+        )
+
         if quantidade <= 0:
             messagebox.showerror(
                 "Erro",
                 "A quantidade de tarefas deve ser maior que zero."
+            )
+            return
+
+        if chegada_max < 0:
+            messagebox.showerror(
+                "Erro",
+                "A chegada máxima não pode ser negativa."
+            )
+            return
+
+        if duracao_max <= 0:
+            messagebox.showerror(
+                "Erro",
+                "A duração máxima deve ser maior que zero."
+            )
+            return
+
+        if prioridade_max <= 0:
+            messagebox.showerror(
+                "Erro",
+                "A prioridade máxima deve ser maior que zero."
             )
             return
 
@@ -155,7 +188,12 @@ def gerar_cenario_interface():
             if not confirmar:
                 return
 
-        novo_cenario = gerar_cenario(quantidade)
+        novo_cenario = gerar_cenario(
+            quantidade,
+            chegada_max,
+            duracao_max,
+            prioridade_max
+        )
 
         processos.clear()
         processos.extend(novo_cenario)
@@ -187,12 +225,11 @@ def gerar_cenario_interface():
                 f"Prioridade: {prioridade_num}"
                 f"{sc_texto}"
             )
-            
 
     except ValueError:
         messagebox.showerror(
             "Erro",
-            "Informe uma quantidade inteira de tarefas."
+            "Informe valores inteiros válidos para os parâmetros."
         )
 
     except Exception as e:
@@ -260,17 +297,14 @@ def form_submit():
             ctx_time,
             alpha
         )
-
-        # Suporta tanto retorno com 3 quanto com 4 valores
-        if len(resultado) == 4:
-            media_espera, media_execucao, media_primeira, nome_processo = resultado
-        else:
-            media_espera, media_execucao, nome_processo = resultado
+        
+        media_execucao, media_espera, media_primeira_execucao, nome_processo = resultado
 
         grafico_processos(
             processos_submit,
             media_execucao,
             media_espera,
+            media_primeira_execucao,
             nome_processo
         )
 
@@ -303,11 +337,7 @@ def habilitar_quantum():
     # R8 - HABILITAÇÃO DO AGING
     # ==========================================================
 
-    # ==========================================================
-    # R8 - HABILITAÇÃO DO AGING
-    # ==========================================================
-
-    if algoritmo_var.get() in (5, 6, 7, 8, 9):
+    if algoritmo_var.get() in (5, 6):
         alpha_label.pack(pady=2)
         alpha_entry.pack(pady=2)
     else:
@@ -324,6 +354,9 @@ def criar_janela():
     global alpha_label, alpha_entry
     global gerador_label, gerador_frame
     global quantidade_cenario_entry
+    global chegada_max_entry
+    global duracao_max_entry
+    global prioridade_max_entry
 
     janela = tk.Tk()
     janela.title("Simulador de Escalonamento")
@@ -519,6 +552,75 @@ def criar_janela():
 
     quantidade_cenario_entry.insert(0, "10")
 
+    tk.Label(
+        gerador_frame,
+        text="Chegada máxima:",
+        font=("Calibri", 11),
+        bg="#FFFFFF"
+    ).grid(row=0, column=1, padx=5)
+
+    chegada_max_entry = tk.Entry(
+        gerador_frame,
+        width=8,
+        bd=2,
+        font=("Calibri", 11),
+        justify="center"
+    )
+    chegada_max_entry.grid(
+        row=1,
+        column=1,
+        padx=5,
+        pady=3
+    )
+
+    chegada_max_entry.insert(0, "8")
+
+    tk.Label(
+        gerador_frame,
+        text="Duração máxima:",
+        font=("Calibri", 11),
+        bg="#FFFFFF"
+    ).grid(row=0, column=2, padx=5)
+
+    duracao_max_entry = tk.Entry(
+        gerador_frame,
+        width=8,
+        bd=2,
+        font=("Calibri", 11),
+        justify="center"
+    )
+    duracao_max_entry.grid(
+        row=1,
+        column=2,
+        padx=5,
+        pady=3
+    )
+
+    duracao_max_entry.insert(0, "6")
+
+    tk.Label(
+        gerador_frame,
+        text="Prioridade máxima:",
+        font=("Calibri", 11),
+        bg="#FFFFFF"
+    ).grid(row=0, column=3, padx=5)
+
+    prioridade_max_entry = tk.Entry(
+        gerador_frame,
+        width=8,
+        bd=2,
+        font=("Calibri", 11),
+        justify="center"
+    )
+    prioridade_max_entry.grid(
+        row=1,
+        column=3,
+        padx=5,
+        pady=3
+    )
+
+    prioridade_max_entry.insert(0, "5")
+
     tk.Button(
         gerador_frame,
         text="Gerar cenário",
@@ -528,7 +630,7 @@ def criar_janela():
         bg="#6A5ACD"
     ).grid(
         row=1,
-        column=1,
+        column=4,
         padx=10
     )
 
@@ -660,7 +762,7 @@ def criar_janela():
     alpha_entry.insert(0, "0")
 
     # Não fazemos .pack() aqui.
-    # O checkbox só aparece quando um algoritmo de prioridade
+    # O campo só aparece quando um algoritmo de prioridade
     # for selecionado.
 
     # ==========================================================
@@ -723,7 +825,7 @@ def criar_janela():
     botao_lotes = tk.Button(
         janela,
         text="Simular em lotes",
-        command=lambda:abrir_simulacao_lotes(janela),
+        command=lambda: abrir_simulacao_lotes(janela),
         font=("Calibri", 15, "bold"),
         fg="#FFFFFF",
         bg="#FFA500",
@@ -740,5 +842,7 @@ def abrir_simulacao_lotes(janela):
     janela_lotes.title("Simulação em Lotes")
     janela_lotes.geometry("500x450")
     janela_lotes.resizable(False, False)
+
+    centralizar_janela(janela_lotes, 400, 450)
 
     configurar_tela_lotes(janela_lotes)
